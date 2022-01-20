@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import re
+import argparse
 
 
 def alignment_dict(align_excel_file):
@@ -84,8 +85,18 @@ def merge_parts(df_):
 
 
 if __name__ == '__main__':
-    print(d_loop_align('AGTCCGGCTGA'))
-#
+    parser = argparse.ArgumentParser()
+    parser.add_argument("trna_file", help='tRNADB-CE file in tab format', nargs='+')
+    parser.add_argument("alignment_file", help="D-loop alignment file")
+
+    args = parser.parse_args()
+    print(args)
+    d_al_dict = alignment_dict(args.alignment_file)
+    clean = make_big_clean(args.trna_file, d_al_dict)
+    merged = merge_parts(clean)
+    merged.to_csv('merged_test.csv')
+
+
 #     parser = argparse.ArgumentParser()
 #     parser.add_argument("trnas", nargs='+', help='Files from tRNADB-CE for cleaning')
 #     parser.add_argument("-a", "--alignment", help="File used to align D-loops", default='d_align.xlsx')

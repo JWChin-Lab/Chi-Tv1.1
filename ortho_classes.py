@@ -424,7 +424,7 @@ class Isoacceptor2(object):
         plt.savefig(output_dir+'/cscores.pdf')
         print(f'Filtering tRNAs...Time Elapsed: {time.time() - now}')
         stringency = start_stringency
-        for i in range(int((start_stringency - min_stringency) / step_size)):
+        for i in range(round((start_stringency - min_stringency) / step_size) + 1):
             if len(self.trnas) <= target:
                 break
 

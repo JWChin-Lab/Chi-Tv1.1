@@ -323,11 +323,6 @@ class Isoacceptor2(object):
                         new_list.append(part)
                 clust_dict[part_type] = new_list
 
-
-
-
-
-
         for part_type, parts in self.all_parts.items():
             if len(parts) < 15:
                 for i, part in enumerate(parts):
@@ -422,9 +417,11 @@ class Isoacceptor2(object):
         for trna in self.trnas.values():
             if not trna.cer_score:
                 trna.trna_cer_scorer()
-        cscores = [trna.cer_score for trna in self.trnas.values()]
-        cscore_hist = [ggplot(cscores) + geom_histogram(binwidth=0.05) + theme_classic() + xlab('Cervettini Score')]
-        save_as_pdf_pages(cscore_hist, filename=f'{output_dir}/cscore_hist.pdf')
+        cscores = [max(trna.cer_score.values()) for trna in self.trnas.values()]
+        plt.hist(cscores, bins=[i for i in np.arange(-1, 1, 0.05)])
+        plt.ylabel('Count')
+        plt.xlabel('Cervettini Score')
+        plt.savefig(output_dir+'/cscores.pdf')
         print(f'Filtering tRNAs...Time Elapsed: {time.time() - now}')
         stringency = start_stringency
         for i in range(int((start_stringency - min_stringency) / step_size)):

@@ -43,21 +43,29 @@ if __name__ == '__main__':
 
     Path(f'{args.output_directory}/folding').mkdir(parents=True, exist_ok=True)
 
+    log_file = f'{args.output_directory}/log_file.txt'
+    with open(log_file, 'a') as f:
+        f.write('Chi-T Run \n' +
+                str(time.time()) + '\n' +
+                str(args) + '\n')
+
     df = pd.read_csv(args.file)
     synth_df = synth_clean(args.synth_file)
     iso = Isoacceptor2(synth_df, id_dict, args.amino_acid, df, ac=first_ac, id_part_change=args.id_part_change)
-    iso.cluster_parts(args.cluster_parts, synth_name=args.synth_name, clust_id_parts=False)
-    iso.chimera(args.synth_name, length_filt=args.length_filt)
+    iso.cluster_parts(args.cluster_parts, synth_name=args.synth_name, clust_id_parts=False, log_file=log_file)
+    iso.chimera(args.synth_name, length_filt=args.length_filt, log_file=log_file)
 
     iso.cervettini_filter(args.output_directory, start_stringency=cf_start, min_stringency=cf_min,
-                          target=cf_targ, step_size=cf_ss)
+                          target=cf_targ, step_size=cf_ss, log_file=log_file)
 
     iso.store_trnas(f'{args.output_directory}/{args.synth_name}_initial.csv')
     # iso.designs_2_fa(args.synth_name, ac=first_ac)
     # rnafold_in_parallel(iso, args.synth_name + '_para', first_ac)
+    print('Folding...')
     rnafold_in_parallel(iso, f'{args.output_directory}/folding/{args.synth_name}_para', first_ac)
     # iso.fold_filter(first_ac, args.synth_name + '_para_' + first_ac + '_complete_fold.out')
-    iso.fold_filter(first_ac, f'{args.output_directory}/folding/{args.synth_name}_para_{first_ac}_complete_fold.out')
+    iso.fold_filter(first_ac, f'{args.output_directory}/folding/{args.synth_name}_para_{first_ac}_complete_fold.out',
+                    log_file=log_file)
     for ac in args.anticodons[1:]:
         iso.change_ac([ac], args.synth_name)
         # iso.designs_2_fa(args.synth_name, ac=ac)
@@ -65,20 +73,21 @@ if __name__ == '__main__':
         rnafold_in_parallel(iso, f'{args.output_directory}/folding/{args.synth_name}_para', ac)
 
         # iso.fold_filter(ac, args.synth_name + '_para_' + ac + '_complete_fold.out')
-        iso.fold_filter(ac, f'{args.output_directory}/folding/{args.synth_name}_para_{ac}_complete_fold.out')
+        iso.fold_filter(ac, f'{args.output_directory}/folding/{args.synth_name}_para_{ac}_complete_fold.out',
+                        log_file=log_file)
 
-    iso.final_filter()
+    iso.final_filter(log_file=log_file)
     iso.store_trnas(f'{args.output_directory}/{args.synth_name}_finalfold.csv')
     if args.select:
-        iso.select(args.synth_name)
+        iso.select(args.synth_name, log_file=log_file)
         iso.store_trnas(f'{args.output_directory}/{args.synth_name}_selected.csv')
 
     cluster = len(iso.trnas) > 40
-    iso.cluster_select(cluster=cluster)
+    iso.cluster_select(cluster=cluster, log_file=log_file)
 
     success = False
     try:
-        driver = webdriver.Safari()
+        driver = webdriver.Chrome()
         driver.maximize_window()
         url = 'http://rna.tbi.univie.ac.at/cgi-bin/RNAWebSuite/RNAfold.cgi'
         final_seqs = [trna.seq[first_ac] for trna in iso.final_trnas.values()]

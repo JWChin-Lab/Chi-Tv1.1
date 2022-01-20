@@ -281,7 +281,7 @@ class Isoacceptor2(object):
 
     #######################
 
-    def cluster_parts(self, sample_size, synth_name, clust_id_parts=True, display=False):
+    def cluster_parts(self, sample_size, synth_name, clust_id_parts=True, display=False, log_file=None):
 
         """This method uses Levenshtein distance between sequences and affinity propagation to cluster parts.
         Clustering could be optimised. For maximum sample size, parameters have been adjusted to:
@@ -329,6 +329,11 @@ class Isoacceptor2(object):
                     part.cluster_id = i
                     part.exemplar = True
 
+        if log_file:
+            with open(log_file, 'a') as f:
+                f.write('Cluster Dict: \n')
+                f.write(str({part_type: len(part_list) for part_type, part_list in clust_dict.items()}) + '\n')
+
         for part_type, parts in clust_dict.items():
             # turn sample into numpy array - not used for clustering, but to find parts at end
             sample = np.asarray([part.seq for part in parts])
@@ -367,7 +372,7 @@ class Isoacceptor2(object):
 
     ###########################
 
-    def chimera(self, synth_name, length_filt=True):
+    def chimera(self, synth_name, length_filt=True, log_file=None):
         """Generates all possible chimeras from ID parts and exemplar parts"""
         count = 0
 
@@ -378,6 +383,11 @@ class Isoacceptor2(object):
 
         for part_type, id_seq in [synth for synth in self.synths if synth.name == synth_name][0].id_seqs.items():
             self.exemplar_parts[part_type] = [id_seq]
+
+        if log_file:
+            with open(log_file, 'a') as f:
+                f.write('Exemplar Parts: \n')
+                f.write(str({part_type: len(part_list) for part_type, part_list in self.exemplar_parts.items()}) + '\n')
 
         print(f'Mixing parts...Time Elapsed: {time.time() - now}')
         listoflistofparts = [[{part_type: part} for part in part_list] for part_type, part_list in
@@ -400,12 +410,17 @@ class Isoacceptor2(object):
         self.trnas = self.trnas_
         if length_filt:
             self.trnas = {name: trna for name, trna in self.trnas.items() if len(trna.seq[self.ac]) < 79}
+        if log_file:
+            with open(log_file, 'a') as f:
+                f.write(f'Unfiltered Chimeras: {len(self.trnas_)}\n')
+                if length_filt:
+                    f.write(f'Length Filtered Chimeras: {len(self.trnas)}\n')
 
         print(f'{len(self.trnas)} Chimeras Made!...Time Elapsed: {time.time() - now}')
 
     ##############################
 
-    def cervettini_filter(self, output_dir, start_stringency=0.5, min_stringency=0, target=1500000, step_size=0.05):
+    def cervettini_filter(self, output_dir, start_stringency=0.5, min_stringency=0, target=1500000, step_size=0.05, log_file=None):
         """Applies the scoring from Cervettini et al., 2020 then filters.
         Filtering applied iteratively until target sequence number reached.
         start_stringency determines initial filtering threshold for max score across any isoacceptor.
@@ -424,14 +439,19 @@ class Isoacceptor2(object):
         plt.savefig(output_dir+'/cscores.pdf')
         print(f'Filtering tRNAs...Time Elapsed: {time.time() - now}')
         stringency = start_stringency
+        log_string = 'Cervettini Filtering: \n'
         for i in range(round((start_stringency - min_stringency) / step_size) + 1):
             if len(self.trnas) <= target:
                 break
 
             self.trnas = {name: trna for name, trna in self.trnas.items() if max(trna.cer_score.values()) <= stringency}
+            log_string += f'Threshold: {stringency} tRNAs remaining: {len(self.trnas)}\n'
             print(f'Threshold: {stringency} tRNAs remaining: {len(self.trnas)}...Time Elapsed: {time.time() - now}')
             stringency -= step_size
 
+        if log_file:
+            with open(log_file, 'a') as f:
+                f.write(log_string)
         print(f'tRNAs Filtered!...tRNAs remaining: {len(self.trnas)}...Time elapsed: {time.time() - now}')
 
     ##############################
@@ -513,7 +533,7 @@ class Isoacceptor2(object):
 
     ###############################
 
-    def fold_filter(self, ac, fold_file, freq_thresh=0.15, div_thresh=10, inplace=True, pattern=trna_pattern):
+    def fold_filter(self, ac, fold_file, freq_thresh=0.15, div_thresh=10, inplace=True, pattern=trna_pattern, log_file=None):
 
         """Filters RNAfold output.
         ac is important to save information to correct dictionary key.
@@ -561,6 +581,10 @@ class Isoacceptor2(object):
                 filtered.update({name: trna})
 
         self.well_folded = {seq_name: trna for seq_name, trna in filtered.items()}
+        if log_file:
+            with open(log_file, 'a') as f:
+                f.write(f'Chimeras: {len(self.well_folded)} Anticodon: {ac} '
+                        f'Frequency: >={freq_thresh} Diversity: <={div_thresh}\n')
         print(f'There are {len(self.well_folded)} well-folding tRNA designs!...Time elapsed: {time.time() - now}')
 
         if inplace:
@@ -593,7 +617,7 @@ class Isoacceptor2(object):
 
     #######################################
 
-    def final_filter(self, freq_thresh=0.3, div_thresh=5, percentile_out=20):
+    def final_filter(self, freq_thresh=0.3, div_thresh=5, percentile_out=20, log_file=None):
 
         """Final filtering step. First finds average freq and div across all sequences (with different ac)
         and filters based on the given thresholds.
@@ -621,11 +645,15 @@ class Isoacceptor2(object):
         upper_quartile = np.percentile([trna.ec_lev_dist for trna in self.trnas.values()], percentile_out)
         self.trnas = {name: trna for name, trna in self.trnas.items() if trna.ec_lev_dist >= upper_quartile}
 
+        if log_file:
+            with open(log_file, 'a') as f:
+                f.write(f'Final Filter with freq_thresh: {freq_thresh} '
+                        f'div_thresh: {div_thresh} percentile_out: {percentile_out}\nChimeras: {len(self.trnas)}\n')
         print(f'Filtering Complete! {len(self.trnas)} remain...Time elapsed: {time.time() - now}')
 
     ########################################
 
-    def select(self, synth_name, advice=False, num_seqs=4, manual_filt=True):
+    def select(self, synth_name, advice=False, num_seqs=4, manual_filt=True, log_file=None):
 
         """Selection step.
         Method calculates levenshtein distance between the tRNA and the native tRNA for this synthetase.
@@ -690,13 +718,16 @@ class Isoacceptor2(object):
                         print('Inappropriate value!')
                         continue
 
+        if log_file and manual_filt:
+            with open(log_file, 'a') as f:
+                f.write(f'Selected {len(self.trnas)} Chimeras with maximum distance to WT {cutoff}\n')
             # self.df_for_plot = self.df_for_plot[self.df_for_plot.to_wt < cutoff]
             # plt.plot(self.df_for_plot.to_wt, self.df_for_plot.to_e_coli, 'ro')
             # plt.pause(0.01)
 
     #############################################
 
-    def cluster_select(self, num_seqs=4, inplace=False, cluster=True, damp=0.5):
+    def cluster_select(self, num_seqs=4, inplace=False, cluster=True, damp=0.5, log_file=None):
 
         def cluster_meat(damping):
 
@@ -719,6 +750,9 @@ class Isoacceptor2(object):
                             # assign cluster_id to each part in all_parts
                             sample[element].cluster_id = cluster_id
                 self.exemplar_trnas = {name: trna for name, trna in self.trnas.items() if trna.exemplar}
+                if log_file:
+                    with open(log_file, 'a') as f:
+                        f.write(f'{len(self.exemplar_trnas)} Cluster Exemplars with Damping: {damping}\n')
 
             except IndexError:
                 damping += 0.1
@@ -751,6 +785,13 @@ class Isoacceptor2(object):
         # print(self.final_trnas)
         # print(chosen_names)
 
+        if log_file:
+            log_string = ''
+            for trna_name, trna in self.final_trnas.items():
+                log_string += f">{trna_name}\n{trna.seq['CTA']}\n{trna.struct['CTA']}\n" \
+                              f"Frequency: {trna.freq['CTA']} Diversity: {trna.div['CTA']}\n"
+            with open(log_file, 'a') as f:
+                f.write(f'{num_seqs} Chimeras Chosen:\nMinimum Distance: {max(distances)}\n' + log_string)
         print(f'Designs Finished!...Time Elapsed: {time.time() - now}')
 
         # if inplace:

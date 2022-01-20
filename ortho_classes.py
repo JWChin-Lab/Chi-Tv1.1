@@ -611,7 +611,7 @@ class Isoacceptor2(object):
                 trna.seq[new_ac] = ''.join([(trna.part_dict_[part_type] if isinstance(trna.part_dict_[part_type], str)
                                              else trna.part_dict_[part_type].seq)
                                             for part_type in part_order])
-            self.designs_2_fa(f'{output_file_stem}', ac=new_ac)
+            # self.designs_2_fa(f'{output_file_stem}', ac=new_ac)
 
         print(f'Anticodon Changed!...Time elapsed: {time.time() - now}')
 

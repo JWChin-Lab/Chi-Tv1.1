@@ -26,7 +26,7 @@ if __name__ == '__main__':
     parser.add_argument("-cf", "--cervettini_filt", nargs='+', help='Parameters for Cervettini Filtering in order '
                                                                     'start_stringency, minimum_stringency, target '
                                                                     'number of chimeras, and step size',
-                        type=float, default=[0.5, 0, 2500000, 0.05])
+                        type=float, default=[0.5, 0.2, 2500000, 0.05])
     parser.add_argument('-a', '--anticodons', nargs='+', help='Anticodons to iterate through')
 
     parser.add_argument('-s', '--select', action='store_true', help='Decides if final selection step occurs')
@@ -49,7 +49,8 @@ if __name__ == '__main__':
     iso.cluster_parts(args.cluster_parts, synth_name=args.synth_name, clust_id_parts=False)
     iso.chimera(args.synth_name, length_filt=args.length_filt)
 
-    iso.cervettini_filter(start_stringency=cf_start, min_stringency=cf_min, target=cf_targ, step_size=cf_ss)
+    iso.cervettini_filter(args.output_directory, start_stringency=cf_start, min_stringency=cf_min,
+                          target=cf_targ, step_size=cf_ss)
 
     iso.store_trnas(f'{args.output_directory}/{args.synth_name}_initial.csv')
     # iso.designs_2_fa(args.synth_name, ac=first_ac)

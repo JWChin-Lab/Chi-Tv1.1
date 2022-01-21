@@ -90,7 +90,6 @@ if __name__ == '__main__':
     parser.add_argument("alignment_file", help="D-loop alignment file")
 
     args = parser.parse_args()
-    print(args)
     d_al_dict = alignment_dict(args.alignment_file)
     clean = make_big_clean(args.trna_file, d_al_dict)
     merged = merge_parts(clean)

@@ -44,7 +44,7 @@ if __name__ == '__main__':
     Path(f'{args.output_directory}/folding').mkdir(parents=True, exist_ok=True)
 
     log_file = f'{args.output_directory}/log_file.txt'
-    with open(log_file, 'a') as f:
+    with open(log_file, 'w') as f:
         f.write('Chi-T Run \n' +
                 str(time.time()) + '\n' +
                 str(args) + '\n')

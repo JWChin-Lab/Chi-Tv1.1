@@ -11,6 +11,7 @@ from plotnine import ggplot, aes, geom_point, theme_classic, geom_histogram, xla
 from matplotlib import pyplot as plt
 from scipy.spatial.distance import pdist
 from cleanup import d_loop_align, d_loop_extend
+import random
 
 
 # ID elements in the form AlaRS: 2, 3, 5...
@@ -149,16 +150,16 @@ class Isoacceptor2(object):
     def __init__(self, synth_df, id_dict, aa, huge_df, ac='CTA', comp_arm_strict=True, v_loop_length=7, id_part_change=None):
 
         # id_dict for instance just takes ID elements for defined isoacceptor class
+        self.exemplar_parts = None
         self.id_dict = id_dict[aa].keys()
         if id_part_change:
             self.id_part_change = id_part_change
         else:
             self.id_part_change = []
 
-        assert type(self.id_part_change) == list
         # id_parts to pass to Synthetase2 instance are parts containing ID bases + acceptor stem
         self.id_parts = {base_to_part_2[base] for base in self.id_dict}
-        self.id_parts.update(['tRNA73-76*']) # self.id_parts.update(['tRNA1-7_66-72*', 'tRNA73-76*'])
+        self.id_parts.update(['tRNA73-76*'])  # self.id_parts.update(['tRNA1-7_66-72*', 'tRNA73-76*'])
         self.id_parts = {part for part in self.id_parts if part not in self.id_part_change}
 
         # List of positions within id_parts that do not change
@@ -179,7 +180,6 @@ class Isoacceptor2(object):
                 else:
                     self.non_part_ids[base_to_part_2[num]] = [num]
                 self.non_negotiable_positions.append(num)
-
 
         # id dict for id positions of other isoacceptors outside of the id positions for this isoacceptor
         # This is to prevent unchangeably high id scores which are constrained by the synthetase chosen
@@ -331,8 +331,8 @@ class Isoacceptor2(object):
 
         if log_file:
             with open(log_file, 'a') as f:
-                f.write('Cluster Dict: \n')
-                f.write(str({part_type: len(part_list) for part_type, part_list in clust_dict.items()}) + '\n')
+                f.write('Cluster Dict: \n' +
+                        str({part_type: len(part_list) for part_type, part_list in clust_dict.items()}) + '\n')
 
         for part_type, parts in clust_dict.items():
             # turn sample into numpy array - not used for clustering, but to find parts at end
@@ -738,7 +738,8 @@ class Isoacceptor2(object):
                                                  for i, j in zip(tril_idx_rows, tril_idx_cols)]
             m = (m + m.T) * -1
 
-            affprop = AffinityPropagation(affinity="precomputed", damping=damp, max_iter=1000, random_state=None)
+            affprop = AffinityPropagation(affinity="precomputed", damping=damping, max_iter=1000, random_state=None)
+            print(f'Clustering with damping: {damping}')
             affprop.fit(m)
 
             try:
@@ -756,7 +757,12 @@ class Isoacceptor2(object):
 
             except IndexError:
                 damping += 0.1
-                cluster_meat(damping)
+                if damping >= 1.0:
+                    print('Clustering Failed...Taking random sample of 40')
+                    self.exemplar_trnas = random.sample(self.trnas.items(), 40)
+                    self.exemplar_trnas = {trna_tup[0]: trna_tup[1] for trna_tup in self.exemplar_trnas}
+                else:
+                    cluster_meat(damping)
 
         now = time.time()
         print('Clustering tRNAs...')
@@ -765,7 +771,7 @@ class Isoacceptor2(object):
             trna.exemplar = False
             trna.cluster_id = None
         if cluster:
-            cluster_meat(damp)
+            cluster_meat(damping=damp)
         else:
             self.exemplar_trnas = self.trnas
 

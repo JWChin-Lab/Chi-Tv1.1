@@ -21,7 +21,7 @@ def rnafold(file_name):
 
 
 def rnafold_in_parallel(iso2, output_file_stem, ac):
-    num_cores = multiprocessing.cpu_count()
+    num_cores = multiprocessing.cpu_count() - 1
     chunk_size = math.ceil(len(iso2.trnas)/num_cores)
     trna_batches = chunks(iso2.trnas, chunk_size)
 

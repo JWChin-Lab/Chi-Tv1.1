@@ -12,6 +12,7 @@ from matplotlib import pyplot as plt
 from scipy.spatial.distance import pdist
 from cleanup import d_loop_align, d_loop_extend
 import random
+import sys
 
 
 # ID elements in the form AlaRS: 2, 3, 5...
@@ -97,7 +98,7 @@ part_order = ['tRNA1-7*', 'tRNA8-9*', 'tRNA10-13*', 'tRNA14-21*', 'tRNA22-25*', 
               'tRNA61-65*', 'tRNA66-72*', 'tRNA73-76*']
 
 trna_pattern = re.compile(
-    '^\\({5,8}\\.{1,3}\\({3,4}\\.{2,}\\){3,4}\\.*\\({4,9}\\.{7}\\){4,9}.*\\.\\({5}\\.{2,}\\){5}\\){5,8}\\.{3,}$')
+    '^\\({5,8}\\.{1,3}\\({3,4}\\.{5,}\\){3,4}\\.*\\({4,9}\\.{7}\\){4,9}.*\\.\\({5}\\.{2,}\\){5}\\){5,8}\\.{3,}$')
 trna_pattern_arg08 = re.compile(
     '^\\({5,8}\\.{1,3}\\({3,4}\\.{2,}\\){3,4}\\.*\\({4,9}\\.{5,7}\\){4,9}.*\\.\\({5}\\.{2,}\\){5}\\){5,8}\\.{3,}$')
 
@@ -281,7 +282,7 @@ class Isoacceptor2(object):
 
     #######################
 
-    def cluster_parts(self, sample_size, synth_name, clust_id_parts=True, display=False, log_file=None):
+    def cluster_parts(self, sample_size, synth_name, clust_id_parts=False, display=False, log_file=None):
 
         """This method uses Levenshtein distance between sequences and affinity propagation to cluster parts.
         Clustering could be optimised. For maximum sample size, parameters have been adjusted to:
@@ -310,7 +311,6 @@ class Isoacceptor2(object):
             trna_id = [synth for synth in self.synths if synth.name == synth_name][0].trna_id
             trna = self.huge_df[self.huge_df.seq_id == trna_id]
             for part_type in self.id_part_change:
-
                 trna_part_seq = list(trna[part_type])[0]
                 trna_part = Part2(trna_part_seq, part_type, self.aa, trna_id, trna_part_seq, self)
                 new_list = []
@@ -368,6 +368,33 @@ class Isoacceptor2(object):
                     cluster_str = ", ".join(cluster)
                     print(f"{part_type}: ID - {cluster_id}: *{exemplar}* {cluster_str}")
 
+
+
+        self.exemplar_parts = {part_type: [part for part in part_list if part.exemplar]
+                               for part_type, part_list in self.all_parts.items()}
+
+        est = np.prod([len(part_list) for part_list in self.exemplar_parts.values()])
+        print(f'Estimated Chimeras: {est}')
+
+        while True:
+            size_ans = input('Continue? (y) or (n):\n')
+            if size_ans.lower() == 'y':
+                break
+            elif size_ans.lower() == 'n':
+                print(f'Consider changing sample size for clustering.\n Current sample size is {sample_size}\n')
+                while True:
+                    size_ans_ = input("Enter new sample size or 'q' to quit\n> ")
+                    if size_ans_.lower() == 'q':
+                        print('Thank you for trying Chi-T!')
+                        sys.exit()
+                    else:
+                        try:
+                            new_size = int(size_ans_)
+                            self.cluster_parts(new_size, synth_name)
+                        except:
+                            print('Inappropriate value!')
+                            continue
+
         print(f'Parts Clustered!...Time elapsed: {time.time() - now}')
 
     ###########################
@@ -378,8 +405,6 @@ class Isoacceptor2(object):
 
         now = time.time()
         print(f'Choosing exemplars...Time Elapsed: {time.time() - now}')
-        self.exemplar_parts = {part_type: [part for part in part_list if part.exemplar]
-                               for part_type, part_list in self.all_parts.items()}
 
         for part_type, id_seq in [synth for synth in self.synths if synth.name == synth_name][0].id_seqs.items():
             self.exemplar_parts[part_type] = [id_seq]
@@ -563,6 +588,17 @@ class Isoacceptor2(object):
                     self.trnas[seq_name].struct[ac] = struct
                     self.trnas[seq_name].div[ac] = div
                     self.trnas[seq_name].freq[ac] = freq
+
+        divs = [t.div[ac] for t in self.trnas]
+        freqs = [t.freq[ac] for t in self.trnas]
+        fig, (ax1, ax2) = plt.subplots(1, 2)
+        fig.suptitle(f"Structural output {ac}")
+        ax1.hist(divs, bins=np.arange(0, 40, 0.5))
+        ax1.set_title('Diversity')
+        ax2.hist(freqs, bins=np.arange(0, 100, 1))
+        ax2.set_title('Frequency')
+        fig.savefig(f'structure_{ac}.pdf')
+
 
         filt_data = {seq_name: trna for seq_name, trna in self.trnas.items()
                      if pattern.match(trna.struct[ac])

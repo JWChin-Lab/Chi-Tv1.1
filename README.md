@@ -5,12 +5,15 @@ Pipeline creates tRNAs for use in genetic code expansion. tRNAs are designed to 
 ## Requirements
 
 RNAFold from the ViennaRNA package must be installed and added to the PATH. The ViennaRNA package can be installed from 'here'.
+
 Python 3 must be installed and added to the PATH.
+
 Python packages are found in requirements.txt
 
 ## Installation
 
 git clone .....
+
 requirements.txt
 
 ## Usage

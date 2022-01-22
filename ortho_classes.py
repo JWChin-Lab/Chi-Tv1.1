@@ -368,10 +368,9 @@ class Isoacceptor2(object):
                     cluster_str = ", ".join(cluster)
                     print(f"{part_type}: ID - {cluster_id}: *{exemplar}* {cluster_str}")
 
-
-
         self.exemplar_parts = {part_type: [part for part in part_list if part.exemplar]
-                               for part_type, part_list in self.all_parts.items()}
+                               for part_type, part_list in self.all_parts.items()
+                               if part_type not in self.id_parts}
 
         est = np.prod([len(part_list) for part_list in self.exemplar_parts.values()])
         print(f'Estimated Chimeras: {est}')
@@ -558,7 +557,8 @@ class Isoacceptor2(object):
 
     ###############################
 
-    def fold_filter(self, ac, fold_file, freq_thresh=0.15, div_thresh=10, inplace=True, pattern=trna_pattern, log_file=None):
+    def fold_filter(self, ac, fold_file, output_dir, freq_thresh=0.15, div_thresh=10, inplace=True,
+                    pattern=trna_pattern, log_file=None):
 
         """Filters RNAfold output.
         ac is important to save information to correct dictionary key.
@@ -586,24 +586,23 @@ class Isoacceptor2(object):
                     freq = re.findall("\d+\.\d+", first)[0]
                     div = re.findall("\d+\.\d+", second)[0]
                     self.trnas[seq_name].struct[ac] = struct
-                    self.trnas[seq_name].div[ac] = div
-                    self.trnas[seq_name].freq[ac] = freq
+                    self.trnas[seq_name].div[ac] = float(div)
+                    self.trnas[seq_name].freq[ac] = float(freq)
 
-        divs = [t.div[ac] for t in self.trnas]
-        freqs = [t.freq[ac] for t in self.trnas]
+        divs = [t.div[ac] for t in self.trnas.values()]
+        freqs = [t.freq[ac] for t in self.trnas.values()]
         fig, (ax1, ax2) = plt.subplots(1, 2)
         fig.suptitle(f"Structural output {ac}")
         ax1.hist(divs, bins=np.arange(0, 40, 0.5))
         ax1.set_title('Diversity')
-        ax2.hist(freqs, bins=np.arange(0, 100, 1))
+        ax2.hist(freqs, bins=np.arange(0, 1, 0.01))
         ax2.set_title('Frequency')
-        fig.savefig(f'structure_{ac}.pdf')
-
+        fig.savefig(output_dir+f'/structure_{ac}.pdf')
 
         filt_data = {seq_name: trna for seq_name, trna in self.trnas.items()
                      if pattern.match(trna.struct[ac])
-                     and float(trna.freq[ac]) >= freq_thresh
-                     and float(trna.div[ac]) <= div_thresh}
+                     and trna.freq[ac] >= freq_thresh
+                     and trna.div[ac] <= div_thresh}
 
         filtered = {}
         for name, trna in filt_data.items():

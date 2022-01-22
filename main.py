@@ -65,7 +65,7 @@ if __name__ == '__main__':
     rnafold_in_parallel(iso, f'{args.output_directory}/folding/{args.synth_name}_para', first_ac)
     # iso.fold_filter(first_ac, args.synth_name + '_para_' + first_ac + '_complete_fold.out')
     iso.fold_filter(first_ac, f'{args.output_directory}/folding/{args.synth_name}_para_{first_ac}_complete_fold.out',
-                    log_file=log_file)
+                    args.output_directory, log_file=log_file)
     for ac in args.anticodons[1:]:
         iso.change_ac([ac], args.synth_name)
         # iso.designs_2_fa(args.synth_name, ac=ac)
@@ -74,7 +74,7 @@ if __name__ == '__main__':
 
         # iso.fold_filter(ac, args.synth_name + '_para_' + ac + '_complete_fold.out')
         iso.fold_filter(ac, f'{args.output_directory}/folding/{args.synth_name}_para_{ac}_complete_fold.out',
-                        log_file=log_file)
+                        args.output_directory, log_file=log_file)
 
     iso.final_filter(log_file=log_file)
     iso.store_trnas(f'{args.output_directory}/{args.synth_name}_finalfold.csv')

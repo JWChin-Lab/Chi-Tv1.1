@@ -390,7 +390,7 @@ class Isoacceptor2(object):
                         try:
                             new_size = int(size_ans_)
                             self.cluster_parts(new_size, synth_name)
-                        except:
+                        except ValueError:
                             print('Inappropriate value!')
                             continue
 
@@ -444,7 +444,8 @@ class Isoacceptor2(object):
 
     ##############################
 
-    def cervettini_filter(self, output_dir, start_stringency=0.5, min_stringency=0, target=1500000, step_size=0.05, log_file=None):
+    def cervettini_filter(self, output_dir, start_stringency=0.5, min_stringency=0, target=1500000, step_size=0.05,
+                          log_file=None):
         """Applies the scoring from Cervettini et al., 2020 then filters.
         Filtering applied iteratively until target sequence number reached.
         start_stringency determines initial filtering threshold for max score across any isoacceptor.
@@ -688,7 +689,7 @@ class Isoacceptor2(object):
 
     ########################################
 
-    def select(self, synth_name, advice=False, num_seqs=4, manual_filt=True, log_file=None):
+    def select(self, synth_name, output_dir, advice=False, num_seqs=4, manual_filt=True, log_file=None):
 
         """Selection step.
         Method calculates levenshtein distance between the tRNA and the native tRNA for this synthetase.
@@ -720,11 +721,10 @@ class Isoacceptor2(object):
             plot = ggplot(self.df_for_plot, aes('to_wt', 'to_e_coli', colour='chosen')) + geom_point() + theme_classic()
             return self.df_for_plot[self.df_for_plot.chosen].sort_values('bin')
         else:
-            # plot = ggplot(self.df_for_plot, aes('to_wt', 'to_e_coli')) + geom_point() + theme_classic()
             plt.plot(self.df_for_plot.to_wt, self.df_for_plot.to_e_coli, 'ro')
             plt.xlabel('Levenshtein Distance to WT')
             plt.ylabel('Levenshtein Distance to E. coli')
-            plt.pause(0.01)
+            plt.savefig(output_dir+'/Distance_Plot.pdf')
 
         # print(plot)
 

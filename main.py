@@ -28,7 +28,8 @@ if __name__ == '__main__':
                                                                     'number of chimeras, and step size',
                         type=float, default=[0.5, 0.2, 2500000, 0.05])
     parser.add_argument('-a', '--anticodons', nargs='+', help='Anticodons to iterate through')
-
+    parser.add_argument('-f', '--frequency', help='Minimum frequency for first anticodon.', default=0.3, type=float)
+    parser.add_argument('-d', '--diversity', help='Maximum diversity for first anticodon.', default=5.0, type=float)
     parser.add_argument('-s', '--select', action='store_true', help='Decides if final selection step occurs')
     args = parser.parse_args()
 
@@ -76,10 +77,10 @@ if __name__ == '__main__':
         iso.fold_filter(ac, f'{args.output_directory}/folding/{args.synth_name}_para_{ac}_complete_fold.out',
                         args.output_directory, log_file=log_file)
 
-    iso.final_filter(log_file=log_file)
+    iso.final_filter(freq_thresh=args.frequency, div_thresh=args.diversity, log_file=log_file)
     iso.store_trnas(f'{args.output_directory}/{args.synth_name}_finalfold.csv')
     if args.select:
-        iso.select(args.synth_name, log_file=log_file)
+        iso.select(args.synth_name, args.output_directory, log_file=log_file)
         iso.store_trnas(f'{args.output_directory}/{args.synth_name}_selected.csv')
 
     cluster = len(iso.trnas) > 40

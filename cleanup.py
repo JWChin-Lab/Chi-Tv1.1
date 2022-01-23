@@ -39,11 +39,11 @@ def d_loop_align(x):
 
 def clean_from_trnadb(df, d_al_dict):
     df_ = df.drop(['Start position', 'End position', '1st Intron start position', '1st Intron end position',
-            '1st Intron seq.', '2nd Intron start position', '2nd Intron end position', '2st Intron seq.',
-            'Decision from Dr. Muto', 'Decision from Dr. Inokuchi', 'Decision from Dr. Yamada', 'Comment of Dr. Muto',
-            'Comment of Dr. Inokuchi', 'Comment of Dr. Yamada', 'Final decision'], axis=1)
+                   '1st Intron seq.', '2nd Intron start position', '2nd Intron end position', '2st Intron seq.',
+                   'Decision from Dr. Muto', 'Decision from Dr. Inokuchi', 'Decision from Dr. Yamada',
+                   'Comment of Dr. Muto', 'Comment of Dr. Inokuchi', 'Comment of Dr. Yamada', 'Final decision'], axis=1)
     df_ = df_.rename(columns={'#Sequence ID': 'seq_id', 'Genome ID': 'gen_id',
-                           'tRNA73-76 (*We used universal position of cloverleaf structure)':'tRNA73-76*'})
+                              'tRNA73-76 (*We used universal position of cloverleaf structure)': 'tRNA73-76*'})
     df_.seq_id = df_.seq_id.apply(lambda x: x.replace('>', ''))
     df_ = df_.dropna(how='any', subset=df_.columns[7:-3])
 
@@ -83,7 +83,6 @@ def merge_parts(df_):
     return df
 
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("trna_file", help='tRNADB-CE file in tab format', nargs='+')
@@ -94,20 +93,3 @@ if __name__ == '__main__':
     clean = make_big_clean(args.trna_file, d_al_dict)
     merged = merge_parts(clean)
     merged.to_csv('merged_test.csv')
-
-
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument("trnas", nargs='+', help='Files from tRNADB-CE for cleaning')
-#     parser.add_argument("-a", "--alignment", help="File used to align D-loops", default='d_align.xlsx')
-#     time_string = ''.join([str(time) for time in time.localtime()[:6]])
-#     parser.add_argument('-o', '--output', help='Output file', default='merged_'+time_string+'.csv')
-#     args = parser.parse_args()
-#
-#     d_al_dict = alignment_dict(args.alignment)
-#     large_df = make_big_clean(args.trnas, d_al_dict)
-#     merge_df = merge_parts(large_df)
-#
-#     merge_df.to_csv(args.output, index=False)
-
-
-

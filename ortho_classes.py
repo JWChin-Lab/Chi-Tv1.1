@@ -7,7 +7,7 @@ import distance
 from itertools import product, chain, islice, combinations
 import time
 import ast
-from plotnine import ggplot, aes, geom_point, theme_classic, geom_histogram, xlab, ylab, save_as_pdf_pages
+from plotnine import ggplot, aes, geom_point, theme_classic
 from matplotlib import pyplot as plt
 from scipy.spatial.distance import pdist
 from cleanup import d_loop_align, d_loop_extend

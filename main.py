@@ -31,6 +31,8 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--frequency', help='Minimum frequency for first anticodon.', default=0.3, type=float)
     parser.add_argument('-d', '--diversity', help='Maximum diversity for first anticodon.', default=5.0, type=float)
     parser.add_argument('-s', '--select', action='store_true', help='Decides if final selection step occurs')
+    parser.add_argument('-n', '--num_iterations', help='Number of times to iterate through Chi-T per synthetase',
+                        default=1, type=int)
     args = parser.parse_args()
 
     if args.cervettini_filt and len(args.cervettini_filt) > 4:
@@ -53,32 +55,33 @@ if __name__ == '__main__':
     df = pd.read_csv(args.file)
     synth_df = synth_clean(args.synth_file)
     iso = Isoacceptor2(synth_df, id_dict, args.amino_acid, df, ac=first_ac, id_part_change=args.id_part_change)
-    iso.cluster_parts(args.cluster_parts, synth_name=args.synth_name, clust_id_parts=False, log_file=log_file)
-    iso.chimera(args.synth_name, length_filt=args.length_filt, log_file=log_file)
+    for i in range(args.num_iterations):
+        with open(log_file, 'a') as f:
+            f.write(f'Iteration {i+1} of {args.num_iterations}\n')
 
-    iso.cervettini_filter(args.output_directory, start_stringency=cf_start, min_stringency=cf_min,
-                          target=cf_targ, step_size=cf_ss, log_file=log_file)
+        iso.cluster_parts(args.cluster_parts, synth_name=args.synth_name, clust_id_parts=False, log_file=log_file,
+                          iteration=i+1)
+        iso.chimera(args.synth_name, length_filt=args.length_filt, log_file=log_file, iteration=i+1)
 
-    iso.store_trnas(f'{args.output_directory}/{args.synth_name}_initial.csv')
-    # iso.designs_2_fa(args.synth_name, ac=first_ac)
-    # rnafold_in_parallel(iso, args.synth_name + '_para', first_ac)
-    print('Folding...')
-    rnafold_in_parallel(iso, f'{args.output_directory}/folding/{args.synth_name}_para', first_ac)
-    # iso.fold_filter(first_ac, args.synth_name + '_para_' + first_ac + '_complete_fold.out')
-    iso.fold_filter(first_ac, f'{args.output_directory}/folding/{args.synth_name}_para_{first_ac}_complete_fold.out',
-                    args.output_directory, log_file=log_file)
-    for ac in args.anticodons[1:]:
-        iso.change_ac([ac], args.synth_name)
-        # iso.designs_2_fa(args.synth_name, ac=ac)
-        # rnafold_in_parallel(iso, args.synth_name + '_para', ac)
-        rnafold_in_parallel(iso, f'{args.output_directory}/folding/{args.synth_name}_para', ac)
+        iso.cervettini_filter(args.output_directory, start_stringency=cf_start, min_stringency=cf_min,
+                              target=cf_targ, step_size=cf_ss, log_file=log_file)
 
-        # iso.fold_filter(ac, args.synth_name + '_para_' + ac + '_complete_fold.out')
-        iso.fold_filter(ac, f'{args.output_directory}/folding/{args.synth_name}_para_{ac}_complete_fold.out',
+        iso.store_trnas(f'{args.output_directory}/{args.synth_name}_initial_iter{i+1}.csv')
+
+        print('Folding...')
+        rnafold_in_parallel(iso, f'{args.output_directory}/folding/{args.synth_name}_para_iter{i+1}', first_ac)
+        iso.fold_filter(first_ac, f'{args.output_directory}/folding/{args.synth_name}_para_iter{i+1}_{first_ac}_complete_fold.out',
                         args.output_directory, log_file=log_file)
+        for ac in args.anticodons[1:]:
+            iso.change_ac([ac], args.synth_name)
+            rnafold_in_parallel(iso, f'{args.output_directory}/folding/{args.synth_name}_para_iter{i+1}', ac)
 
-    iso.final_filter(freq_thresh=args.frequency, div_thresh=args.diversity, log_file=log_file)
-    iso.store_trnas(f'{args.output_directory}/{args.synth_name}_finalfold.csv')
+            iso.fold_filter(ac, f'{args.output_directory}/folding/{args.synth_name}_para_iter{i+1}_{ac}_complete_fold.out',
+                            args.output_directory, log_file=log_file)
+
+        iso.final_filter(freq_thresh=args.frequency, div_thresh=args.diversity, log_file=log_file, iteration=i+1)
+        iso.store_trnas(f'{args.output_directory}/{args.synth_name}_finalfold_iter{i+1}.csv')
+
     if args.select:
         iso.select(args.synth_name, args.output_directory, log_file=log_file)
         iso.store_trnas(f'{args.output_directory}/{args.synth_name}_selected.csv')
@@ -138,9 +141,3 @@ if __name__ == '__main__':
 
     if success:
         driver.quit()
-
-
-
-
-
-

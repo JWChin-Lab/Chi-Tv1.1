@@ -53,7 +53,16 @@ if __name__ == '__main__':
                 str(time.time()) + '\n' +
                 str(args) + '\n\n')
 
-    df = pd.read_csv(args.file)
+    df = pd.read_csv(args.file, usecols=['seq_id', 'Amino Acid', 'tRNA1-7*', 'tRNA8-9*', 'tRNA10-13*', 'tRNA14-21*',
+                                         'tRNA22-25*', 'tRNA26*', 'tRNA27-31*', 'tRNA32-38*', 'tRNA39-43*',
+                                         'tRNA44-48*', 'tRNA49-53*', 'tRNA54-60*', 'tRNA61-65*', 'tRNA66-72*',
+                                         'tRNA73-76*', 'tRNA14-21* aligned', 'tRNA1-7_66-72*', 'tRNA10-13_22-25*',
+                                         'tRNA14-21_54-60*', 'tRNA14-21_54-60* aligned', 'tRNA26_44-48*',
+                                         'tRNA27-31_39-43*', 'tRNA49-53_61-65*'],
+                     dtype={'Amino Acid': 'category', 'tRNA8-9*': 'category', 'tRNA26*': 'category',
+                            'tRNA73-76*': 'category'},
+                     engine='c')
+
     synth_df = synth_clean(args.synth_file)
     iso = Isoacceptor2(synth_df, id_dict, args.amino_acid, df, ac=first_ac, id_part_change=args.id_part_change)
 
@@ -86,7 +95,7 @@ if __name__ == '__main__':
                 iso.fold_filter(ac, f'{args.output_directory}/folding/{synth_name}_para_iter{i+1}_{ac}_complete_fold.out',
                                 args.output_directory, log_file=log_file)
 
-            iso.final_filter(freq_thresh=args.frequency, div_thresh=args.diversity, log_file=log_file, iteration=i+1)
+            iso.final_filter(freq_thresh=args.frequency, div_thresh=args.diversity, log_file=log_file)
             iso.store_trnas(f'{args.output_directory}/{synth_name}_finalfold_iter{i+1}.csv')
 
         if args.select:

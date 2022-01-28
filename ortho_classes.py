@@ -673,7 +673,7 @@ class Isoacceptor2(object):
 
     #######################################
 
-    def final_filter(self, freq_thresh=0.3, div_thresh=5, percentile_out=20, log_file=None, iteration=1):
+    def final_filter(self, freq_thresh=0.3, div_thresh=5, percentile_out=20, log_file=None):
 
         """Final filtering step. First finds average freq and div across all sequences (with different ac)
         and filters based on the given thresholds.

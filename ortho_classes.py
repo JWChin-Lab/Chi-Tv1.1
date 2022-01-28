@@ -382,7 +382,6 @@ class Isoacceptor2(object):
         self.exemplar_parts = {part_type: [part for part in part_list if part.exemplar in ['all', iteration]]
                                for part_type, part_list in self.all_parts.items()
                                if part_type not in self.id_parts}
-        print(self.exemplar_parts)
 
         for part_type, part_list in self.exemplar_parts.items():
             if part_type in self.used_parts.keys():
@@ -848,8 +847,6 @@ class Isoacceptor2(object):
         rows = c[ind]
         self.final_trnas = [read_back[i] for i in rows]
         self.final_trnas = {trna_name: trna for trna_dict in self.final_trnas for trna_name, trna in trna_dict.items()}
-        # print(self.final_trnas)
-        # print(chosen_names)
 
         if log_file:
             log_string = ''

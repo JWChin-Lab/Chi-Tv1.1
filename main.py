@@ -15,7 +15,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("file", help='Clean tRNADB-CE file')
     parser.add_argument("synth_file", help='File containing synthetase information')
-    parser.add_argument("synth_name", help='Name of synthetase matching to entry in synth_file')
+    parser.add_argument("synth_name", help='Name of synthetase matching to entry in synth_file',
+                        nargs='+')
     parser.add_argument("amino_acid", help='Amino Acid specified for tRNA generation')
     parser.add_argument('-o', '--output_directory', help='Directory to store output files', default='')
     parser.add_argument('-ip', '--id_part_change', help='Identity parts that should be chimerified (except ID element)',
@@ -48,96 +49,104 @@ if __name__ == '__main__':
 
     log_file = f'{args.output_directory}/log_file.txt'
     with open(log_file, 'w') as f:
-        f.write('Chi-T Run \n' +
+        f.write('Chi-T\n' +
                 str(time.time()) + '\n' +
-                str(args) + '\n')
+                str(args) + '\n\n')
 
     df = pd.read_csv(args.file)
     synth_df = synth_clean(args.synth_file)
     iso = Isoacceptor2(synth_df, id_dict, args.amino_acid, df, ac=first_ac, id_part_change=args.id_part_change)
-    for i in range(args.num_iterations):
+
+    for j, synth_name in enumerate(args.synth_name):
+
         with open(log_file, 'a') as f:
-            f.write(f'Iteration {i+1} of {args.num_iterations}\n')
+            f.write(f'##################################################\n\nChi-T Run for {synth_name}\n')
 
-        iso.cluster_parts(args.cluster_parts, synth_name=args.synth_name, clust_id_parts=False, log_file=log_file,
-                          iteration=i+1)
-        iso.chimera(args.synth_name, length_filt=args.length_filt, log_file=log_file, iteration=i+1)
+        for i in range(j*args.num_iterations, (j+1)*args.num_iterations):
+            with open(log_file, 'a') as f:
+                f.write(f'\n***************************************\n\nIteration {i+1} of {args.num_iterations}\n')
 
-        iso.cervettini_filter(args.output_directory, start_stringency=cf_start, min_stringency=cf_min,
-                              target=cf_targ, step_size=cf_ss, log_file=log_file)
+            iso.cluster_parts(args.cluster_parts, synth_name=synth_name, clust_id_parts=False, log_file=log_file,
+                              iteration=i+1)
+            iso.chimera(synth_name, length_filt=args.length_filt, log_file=log_file, iteration=i+1)
+            iso.cervettini_filter(args.output_directory, start_stringency=cf_start, min_stringency=cf_min,
+                                  target=cf_targ, step_size=cf_ss, log_file=log_file)
+            iso.store_trnas(f'{args.output_directory}/{synth_name}_initial_iter{i+1}.csv')
 
-        iso.store_trnas(f'{args.output_directory}/{args.synth_name}_initial_iter{i+1}.csv')
-
-        print('Folding...')
-        rnafold_in_parallel(iso, f'{args.output_directory}/folding/{args.synth_name}_para_iter{i+1}', first_ac)
-        iso.fold_filter(first_ac, f'{args.output_directory}/folding/{args.synth_name}_para_iter{i+1}_{first_ac}_complete_fold.out',
-                        args.output_directory, log_file=log_file)
-        for ac in args.anticodons[1:]:
-            iso.change_ac([ac], args.synth_name)
-            rnafold_in_parallel(iso, f'{args.output_directory}/folding/{args.synth_name}_para_iter{i+1}', ac)
-
-            iso.fold_filter(ac, f'{args.output_directory}/folding/{args.synth_name}_para_iter{i+1}_{ac}_complete_fold.out',
+            print('Folding...')
+            rnafold_in_parallel(iso, f'{args.output_directory}/folding/{synth_name}_para_iter{i+1}', first_ac)
+            iso.fold_filter(first_ac,
+                            f'{args.output_directory}/folding/{synth_name}_para_iter{i+1}_{first_ac}_complete_fold.out',
                             args.output_directory, log_file=log_file)
 
-        iso.final_filter(freq_thresh=args.frequency, div_thresh=args.diversity, log_file=log_file, iteration=i+1)
-        iso.store_trnas(f'{args.output_directory}/{args.synth_name}_finalfold_iter{i+1}.csv')
+            for ac in args.anticodons[1:]:
+                iso.change_ac([ac], synth_name)
+                rnafold_in_parallel(iso, f'{args.output_directory}/folding/{synth_name}_para_iter{i+1}', ac)
 
-    if args.select:
-        iso.select(args.synth_name, args.output_directory, log_file=log_file)
-        iso.store_trnas(f'{args.output_directory}/{args.synth_name}_selected.csv')
+                iso.fold_filter(ac, f'{args.output_directory}/folding/{synth_name}_para_iter{i+1}_{ac}_complete_fold.out',
+                                args.output_directory, log_file=log_file)
 
-    cluster = len(iso.trnas) > 40
-    iso.cluster_select(cluster=cluster, log_file=log_file)
+            iso.final_filter(freq_thresh=args.frequency, div_thresh=args.diversity, log_file=log_file, iteration=i+1)
+            iso.store_trnas(f'{args.output_directory}/{synth_name}_finalfold_iter{i+1}.csv')
 
-    success = False
-    try:
-        driver = webdriver.Chrome()
-        driver.maximize_window()
-        url = 'http://rna.tbi.univie.ac.at/cgi-bin/RNAWebSuite/RNAfold.cgi'
-        final_seqs = [trna.seq[first_ac] for trna in iso.final_trnas.values()]
+        if args.select:
+            iso.select(synth_name, args.output_directory, log_file=log_file)
+            iso.store_trnas(f'{args.output_directory}/{synth_name}_selected.csv')
 
-        for i in range(3):
-            driver.execute_script("window.open('');")
+        cluster = len(iso.trnas) > 40
+        iso.cluster_select(cluster=cluster, log_file=log_file)
 
-        for seq, handle in zip(final_seqs, driver.window_handles):
-            driver.switch_to.window(handle)
-            driver.get(url)
-            text_box = driver.find_element(By.ID, 'SCREEN')
-            text_box.send_keys(seq)
-            submit = driver.find_element(By.CLASS_NAME, 'proceed')
-            submit.click()
+        success = False
+        try:
+            driver = webdriver.Chrome()
+            driver.maximize_window()
+            url = 'http://rna.tbi.univie.ac.at/cgi-bin/RNAWebSuite/RNAfold.cgi'
+            final_seqs = [trna.seq[first_ac] for trna in iso.final_trnas.values()]
 
-        handles = driver.window_handles
-        handles_to_remove = []
+            for i in range(3):
+                driver.execute_script("window.open('');")
+
+            for seq, handle in zip(final_seqs, driver.window_handles):
+                driver.switch_to.window(handle)
+                driver.get(url)
+                text_box = driver.find_element(By.ID, 'SCREEN')
+                text_box.send_keys(seq)
+                submit = driver.find_element(By.CLASS_NAME, 'proceed')
+                submit.click()
+
+            handles = driver.window_handles
+            handles_to_remove = []
+            while True:
+                success = True
+                handles = [handle for handle in handles if handle not in handles_to_remove]
+                if len(handles) == 0:
+                    break
+                for handle in handles:
+                    time.sleep(0.25)
+                    try:
+                        driver.switch_to.window(handle)
+                        driver.find_element(By.XPATH, '//*[@id="contentmain"]/h3[1]')
+                        driver.execute_script("window.scrollTo(0, 300)")
+                        handles_to_remove.append(handle)
+                    except NoSuchElementException:
+                        pass
+        except:
+            pass
+
         while True:
-            success = True
-            handles = [handle for handle in handles if handle not in handles_to_remove]
-            if len(handles) == 0:
+            accept = input('Use these tRNAs? (y)es or (n)o\n> ')
+            if accept.lower() == 'y':
+                iso.trnas = iso.final_trnas
+                iso.store_trnas(f'{args.output_directory}/{synth_name}_final_four.csv')
+                iso.iter_trnas = {}
                 break
-            for handle in handles:
-                time.sleep(0.25)
-                try:
-                    driver.switch_to.window(handle)
-                    driver.find_element(By.XPATH, '//*[@id="contentmain"]/h3[1]')
-                    driver.execute_script("window.scrollTo(0, 300)")
-                    handles_to_remove.append(handle)
-                except NoSuchElementException:
-                    pass
-    except:
-        pass
+            elif accept.lower() == 'n':
+                print("Well I dunno man what do you want from me I'm just a machine make your own tRNAs")
+                iso.iter_trnas = {}
+                break
+            else:
+                print('Innapropriate value!')
+                continue
 
-    while True:
-        accept = input('Use these tRNAs? (y)es or (n)o\n> ')
-        if accept.lower() == 'y':
-            iso.trnas = iso.final_trnas
-            iso.store_trnas(f'{args.output_directory}/{args.synth_name}_final_four.csv')
-            break
-        elif accept.lower() == 'n':
-            print("Well I dunno man what do you want from me I'm just a machine make your own tRNAs")
-            break
-        else:
-            print('Innapropriate value!')
-            continue
-
-    if success:
-        driver.quit()
+        if success:
+            driver.quit()

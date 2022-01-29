@@ -737,18 +737,18 @@ class Isoacceptor2(object):
                          self.trnas.items()}
         self.df_for_plot = pd.DataFrame.from_dict(dict_for_plot, orient='index')
         self.df_for_plot.columns = ['to_e_coli', 'to_wt', 'seq']
-        if advice:
-            self.df_for_plot['bin'] = pd.qcut(self.df_for_plot['to_e_coli'], num_seqs, labels=[1, 2, 3, 4])
-            self.df_for_plot.groupby('bin').to_e_coli.min()
-            idx = self.df_for_plot.groupby('bin').to_wt.transform(min) == self.df_for_plot['to_wt']
-            self.df_for_plot['chosen'] = idx
-            plot = ggplot(self.df_for_plot, aes('to_wt', 'to_e_coli', colour='chosen')) + geom_point() + theme_classic()
-            return self.df_for_plot[self.df_for_plot.chosen].sort_values('bin')
-        else:
-            plt.plot(self.df_for_plot.to_wt, self.df_for_plot.to_e_coli, 'ro')
-            plt.xlabel('Levenshtein Distance to WT')
-            plt.ylabel('Levenshtein Distance to E. coli')
-            plt.savefig(output_dir+'/Distance_Plot.pdf')
+        # if advice:
+        #     self.df_for_plot['bin'] = pd.qcut(self.df_for_plot['to_e_coli'], num_seqs, labels=[1, 2, 3, 4])
+        #     self.df_for_plot.groupby('bin').to_e_coli.min()
+        #     idx = self.df_for_plot.groupby('bin').to_wt.transform(min) == self.df_for_plot['to_wt']
+        #     self.df_for_plot['chosen'] = idx
+        #     plot = ggplot(self.df_for_plot, aes('to_wt', 'to_e_coli', colour='chosen')) + geom_point() + theme_classic()
+        #     return self.df_for_plot[self.df_for_plot.chosen].sort_values('bin')
+        # else:
+        plt.plot(self.df_for_plot.to_wt, self.df_for_plot.to_e_coli, 'ro')
+        plt.xlabel('Levenshtein Distance to WT')
+        plt.ylabel('Levenshtein Distance to E. coli')
+        plt.savefig(output_dir+'/Distance_Plot.pdf')
 
         # print(plot)
 

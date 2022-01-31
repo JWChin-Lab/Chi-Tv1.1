@@ -13,6 +13,7 @@ from scipy.spatial.distance import pdist
 from cleanup import d_loop_align, d_loop_extend
 import random
 import sys
+import pprint
 
 
 # ID elements in the form AlaRS: 2, 3, 5...
@@ -123,19 +124,45 @@ class Synthetase2(object):
         self.id_parts = id_parts
         self.iso = iso
         self.huge_df = huge_df
+        self.non_id_parts = [part_type for part_type in base_to_part_2.values() if part_type not in self.id_parts]
 
         self.id_seqs = {}
-        for id_part in self.id_parts:
-            try:
-                seq = self.huge_df[self.huge_df.seq_id == self.trna_id].iloc[0][id_part]
-                if id_part != 'tRNA14-21_54-60*':
-                    align = seq
-                else:
-                    align = self.huge_df[self.huge_df.seq_id == self.trna_id].iloc[0]['tRNA14-21_54-60* aligned']
-                self.id_seqs[id_part] = Part2(seq, id_part, self.aa, self.trna_id, align, self.iso)
+        self.non_id_seqs = {}
+        for part in base_to_part_2.values():
+            if part in self.id_parts:
+                try:
+                    seq = self.huge_df[self.huge_df.seq_id == self.trna_id].iloc[0][part]
+                    if part != 'tRNA14-21_54-60*':
+                        align = seq
+                    else:
+                        align = self.huge_df[self.huge_df.seq_id == self.trna_id].iloc[0]['tRNA14-21_54-60* aligned']
+                    self.id_seqs[part] = Part2(seq, part, self.aa, self.trna_id, align, self.iso)
 
-            except IndexError:
-                pass
+                except IndexError:
+                    pass
+            else:
+                try:
+                    seq = self.huge_df[self.huge_df.seq_id == self.trna_id].iloc[0][part]
+                    if part != 'tRNA14-21_54-60*':
+                        align = seq
+                    else:
+                        align = self.huge_df[self.huge_df.seq_id == self.trna_id].iloc[0]['tRNA14-21_54-60* aligned']
+                    self.non_id_seqs[part] = Part2(seq, part, self.aa, self.trna_id, align, self.iso)
+
+                except IndexError:
+                    pass
+
+        # for id_part in self.id_parts:
+        #     try:
+        #         seq = self.huge_df[self.huge_df.seq_id == self.trna_id].iloc[0][id_part]
+        #         if id_part != 'tRNA14-21_54-60*':
+        #             align = seq
+        #         else:
+        #             align = self.huge_df[self.huge_df.seq_id == self.trna_id].iloc[0]['tRNA14-21_54-60* aligned']
+        #         self.id_seqs[id_part] = Part2(seq, id_part, self.aa, self.trna_id, align, self.iso)
+        #
+        #     except IndexError:
+        #         pass
 
 
 ###################################################################################################################
@@ -389,7 +416,8 @@ class Isoacceptor2(object):
             else:
                 self.used_parts[part_type] = [part for part in part_list if part.exemplar == iteration]
 
-        est = np.prod([len(part_list) for part_list in self.exemplar_parts.values()])
+        est = np.prod([len(part_list) + 1 if part_type != 'tRNA8-9*' else len(part_list)
+                       for part_type, part_list in self.exemplar_parts.items()])
         print(f'Estimated Chimeras: {est}')
 
         while True:
@@ -424,6 +452,16 @@ class Isoacceptor2(object):
 
         for part_type, id_seq in [synth for synth in self.synths if synth.name == synth_name][0].id_seqs.items():
             self.exemplar_parts[part_type] = [id_seq]
+
+        for part_type, non_id_seq in [synth for synth in self.synths if synth.name == synth_name][0].non_id_seqs.items():
+            if non_id_seq.seq not in [part.seq for part in self.exemplar_parts[part_type]]:
+                self.exemplar_parts[part_type].append(non_id_seq)
+
+        # print(f'ID seqs: {[synth for synth in self.synths if synth.name == synth_name][0].id_seqs.items()}')
+        # print(f'non ID seqs: {[synth for synth in self.synths if synth.name == synth_name][0].non_id_seqs.items()}')
+        #
+        # pprint.pprint(self.exemplar_parts)
+        # sys.exit()
 
         if log_file:
             with open(log_file, 'a') as f:
@@ -667,7 +705,6 @@ class Isoacceptor2(object):
                 trna.seq[new_ac] = ''.join([(trna.part_dict_[part_type] if isinstance(trna.part_dict_[part_type], str)
                                              else trna.part_dict_[part_type].seq)
                                             for part_type in part_order])
-            # self.designs_2_fa(f'{output_file_stem}', ac=new_ac)
 
         print(f'Anticodon Changed!...Time elapsed: {time.time() - now}')
 
@@ -749,8 +786,6 @@ class Isoacceptor2(object):
         plt.xlabel('Levenshtein Distance to WT')
         plt.ylabel('Levenshtein Distance to E. coli')
         plt.savefig(output_dir+'/Distance_Plot.pdf')
-
-        # print(plot)
 
         if manual_filt:
             while True:

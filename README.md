@@ -30,6 +30,16 @@ To format in a way Chi-T can use, use the script cleanup.py with the following c
 
 A D-loop alignment file is supplied in the distribution as d_align.xlsx.
 
+### Synthetase File
+
+To supply Chi-T with synthetases, you must supply an excel file in the format:
+
+Synth Name | Synth ID | tRNA ID | Genome ID
+
+* Synth name - Arbitrary Name for your own purposes
+
+*  Synth ID - a protein identifier e.g. a UNIPROT ID although currently not need
+
 ### tRNA Designs
 
 To use Chi-T call the script main.py with the corresponding arguments and options. Use python main.py -h to get a description of all possible inputs. 

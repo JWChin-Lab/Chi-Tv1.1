@@ -98,6 +98,8 @@ part_order = ['tRNA1-7*', 'tRNA8-9*', 'tRNA10-13*', 'tRNA14-21*', 'tRNA22-25*', 
               'tRNA61-65*', 'tRNA66-72*', 'tRNA73-76*']
 
 trna_pattern = re.compile(
+    '^\\({5,8}\\.{1,3}\\({4}\\.{5,}\\){3,4}\\.*\\({4,9}\\.{7}\\){4,9}.*\\.\\({5}\\.{2,}\\){5}\\){5,8}\\.{3,}$')
+ile_pattern = re.compile(
     '^\\({5,8}\\.{1,3}\\({3,4}\\.{5,}\\){3,4}\\.*\\({4,9}\\.{7}\\){4,9}.*\\.\\({5}\\.{2,}\\){5}\\){5,8}\\.{3,}$')
 trna_pattern_arg08 = re.compile(
     '^\\({5,8}\\.{1,3}\\({3,4}\\.{2,}\\){3,4}\\.*\\({4,9}\\.{5,7}\\){4,9}.*\\.\\({5}\\.{2,}\\){5}\\){5,8}\\.{3,}$')
@@ -193,6 +195,8 @@ class Isoacceptor2(object):
         self.ac = ac
         self.huge_df = huge_df
         self.trnas = dict()
+        self.used_parts = {}
+        self.iter_trnas = {}
 
         self.comp_arm_strict = comp_arm_strict
 
@@ -242,6 +246,7 @@ class Isoacceptor2(object):
                                       and isinstance(part_t.align, str)]
                           for part_type, part_list in self.all_parts.items()}
 
+        # Removes ASLs that close up
         self.all_parts['tRNA32-38*'] = [part for part in self.all_parts['tRNA32-38*']
                                         if (part.seq[0] + part.seq[-1] not in ['CG', 'GC'])]
 
@@ -282,7 +287,7 @@ class Isoacceptor2(object):
 
     #######################
 
-    def cluster_parts(self, sample_size, synth_name, clust_id_parts=False, display=False, log_file=None):
+    def cluster_parts(self, sample_size, synth_name, clust_id_parts=False, display=False, log_file=None, iteration=1):
 
         """This method uses Levenshtein distance between sequences and affinity propagation to cluster parts.
         Clustering could be optimised. For maximum sample size, parameters have been adjusted to:
@@ -307,6 +312,12 @@ class Isoacceptor2(object):
                       for part_type, parts in clust_dict.items()
                       if len(parts) >= 15}
 
+        if self.used_parts:
+            clust_dict = {part_type: [part
+                                      for part in part_list
+                                      if part not in self.used_parts[part_type]]
+                          for part_type, part_list in clust_dict.items()}
+
         if self.id_part_change:
             trna_id = [synth for synth in self.synths if synth.name == synth_name][0].trna_id
             trna = self.huge_df[self.huge_df.seq_id == trna_id]
@@ -327,7 +338,7 @@ class Isoacceptor2(object):
             if len(parts) < 15:
                 for i, part in enumerate(parts):
                     part.cluster_id = i
-                    part.exemplar = True
+                    part.exemplar = 'all'
 
         if log_file:
             with open(log_file, 'a') as f:
@@ -357,7 +368,7 @@ class Isoacceptor2(object):
             # iterate through clusters
             for cluster_id in np.unique(affprop.labels_):
                 # identify exemplar for each cluster (found at centre)
-                parts[affprop.cluster_centers_indices_[cluster_id]].exemplar = True
+                parts[affprop.cluster_centers_indices_[cluster_id]].exemplar = iteration
                 for element_list in np.nonzero(affprop.labels_ == cluster_id):
                     for element in element_list:
                         # assign cluster_id to each part in all_parts
@@ -368,9 +379,15 @@ class Isoacceptor2(object):
                     cluster_str = ", ".join(cluster)
                     print(f"{part_type}: ID - {cluster_id}: *{exemplar}* {cluster_str}")
 
-        self.exemplar_parts = {part_type: [part for part in part_list if part.exemplar]
+        self.exemplar_parts = {part_type: [part for part in part_list if part.exemplar in ['all', iteration]]
                                for part_type, part_list in self.all_parts.items()
                                if part_type not in self.id_parts}
+
+        for part_type, part_list in self.exemplar_parts.items():
+            if part_type in self.used_parts.keys():
+                self.used_parts[part_type] += [part for part in part_list if part.exemplar == iteration]
+            else:
+                self.used_parts[part_type] = [part for part in part_list if part.exemplar == iteration]
 
         est = np.prod([len(part_list) for part_list in self.exemplar_parts.values()])
         print(f'Estimated Chimeras: {est}')
@@ -398,7 +415,7 @@ class Isoacceptor2(object):
 
     ###########################
 
-    def chimera(self, synth_name, length_filt=True, log_file=None):
+    def chimera(self, synth_name, length_filt=True, log_file=None, iteration=1):
         """Generates all possible chimeras from ID parts and exemplar parts"""
         count = 0
 
@@ -427,7 +444,7 @@ class Isoacceptor2(object):
         self.trnas_ = {}
 
         for i, trna_ in enumerate(self.trnas):
-            self.trnas_.update({f'{synth_name}_seq{i}': tRNA(trna_, self.ac)})
+            self.trnas_.update({f'{synth_name}_iter{iteration}_seq{i}': tRNA(trna_, self.ac)})
             count += 1
             if count % 400000 == 0:
                 print(f'{count} chimeras made...Time Elapsed: {time.time() - now}')
@@ -492,11 +509,14 @@ class Isoacceptor2(object):
                                   {ac: div for ac, div in trna.div.items()},
                                   {ac: freq for ac, freq in trna.freq.items()}]
                        for seq_name, trna in self.trnas.items()}
-        trna_df = pd.DataFrame.from_dict(dict_for_df, orient='index')
-        trna_df = trna_df.reset_index()
-        trna_df.columns = ['name', 'seq', 'part_dict', 'cer_score', 'struct', 'div', 'freq']
-        trna_df.to_csv(filename, index=False)
-        print(f'tRNAs Stored!...Time elapsed: {time.time() - now}')
+        if dict_for_df:
+            trna_df = pd.DataFrame.from_dict(dict_for_df, orient='index')
+            trna_df = trna_df.reset_index()
+            trna_df.columns = ['name', 'seq', 'part_dict', 'cer_score', 'struct', 'div', 'freq']
+            trna_df.to_csv(filename, index=False)
+            print(f'tRNAs Stored!...Time elapsed: {time.time() - now}')
+        else:
+            print('No tRNAs to store!')
 
     def retrieve_trnas(self, filename):
         """Retrieves said tRNA information from .csv"""
@@ -671,15 +691,18 @@ class Isoacceptor2(object):
                       if trna.avg_freq > freq_thresh
                       and trna.avg_div < div_thresh}
 
-        ecoli_wt = ecoli_df.loc[[self.aa]]
-        ecoli_wt['seq'] = ecoli_wt.iloc[:, 1:].apply(lambda x: ''.join(x), axis=1)
-        ecoli_wt['seq'] = ecoli_wt.seq.apply(lambda x: x.replace('-', ''))
-        wt_seqs = ecoli_wt.seq
-        for name, trna in self.trnas.items():
-            trna.ec_lev_dist = sum([distance.levenshtein(trna.seq[self.ac], seq)
-                                    for seq in wt_seqs]) / len(wt_seqs)
-        upper_quartile = np.percentile([trna.ec_lev_dist for trna in self.trnas.values()], percentile_out)
-        self.trnas = {name: trna for name, trna in self.trnas.items() if trna.ec_lev_dist >= upper_quartile}
+        if len(self.trnas) > 0:
+            ecoli_wt = ecoli_df.loc[[self.aa]]
+            ecoli_wt['seq'] = ecoli_wt.iloc[:, 1:].apply(lambda x: ''.join(x), axis=1)
+            ecoli_wt['seq'] = ecoli_wt.seq.apply(lambda x: x.replace('-', ''))
+            wt_seqs = ecoli_wt.seq
+            for name, trna in self.trnas.items():
+                trna.ec_lev_dist = sum([distance.levenshtein(trna.seq[self.ac], seq)
+                                        for seq in wt_seqs]) / len(wt_seqs)
+            upper_quartile = np.percentile([trna.ec_lev_dist for trna in self.trnas.values()], percentile_out)
+            self.trnas = {name: trna for name, trna in self.trnas.items() if trna.ec_lev_dist >= upper_quartile}
+
+            self.iter_trnas.update(self.trnas)
 
         if log_file:
             with open(log_file, 'a') as f:
@@ -700,6 +723,7 @@ class Isoacceptor2(object):
         The method I think I will use is to bin tRNAs with regard to distance from E. coli, then take
         the tRNA closest to native from each bin i.e. taking the postive face of the graph."""
 
+        self.trnas = self.iter_trnas
         synth_ = [synth for synth in self.synths if synth.name == synth_name][0]
         native = pd.Series()
         native['seq'] = self.huge_df[self.huge_df.seq_id == synth_.trna_id].loc[:, 'tRNA1-7*':'tRNA73-76*'].apply(
@@ -713,18 +737,18 @@ class Isoacceptor2(object):
                          self.trnas.items()}
         self.df_for_plot = pd.DataFrame.from_dict(dict_for_plot, orient='index')
         self.df_for_plot.columns = ['to_e_coli', 'to_wt', 'seq']
-        if advice:
-            self.df_for_plot['bin'] = pd.qcut(self.df_for_plot['to_e_coli'], num_seqs, labels=[1, 2, 3, 4])
-            self.df_for_plot.groupby('bin').to_e_coli.min()
-            idx = self.df_for_plot.groupby('bin').to_wt.transform(min) == self.df_for_plot['to_wt']
-            self.df_for_plot['chosen'] = idx
-            plot = ggplot(self.df_for_plot, aes('to_wt', 'to_e_coli', colour='chosen')) + geom_point() + theme_classic()
-            return self.df_for_plot[self.df_for_plot.chosen].sort_values('bin')
-        else:
-            plt.plot(self.df_for_plot.to_wt, self.df_for_plot.to_e_coli, 'ro')
-            plt.xlabel('Levenshtein Distance to WT')
-            plt.ylabel('Levenshtein Distance to E. coli')
-            plt.savefig(output_dir+'/Distance_Plot.pdf')
+        # if advice:
+        #     self.df_for_plot['bin'] = pd.qcut(self.df_for_plot['to_e_coli'], num_seqs, labels=[1, 2, 3, 4])
+        #     self.df_for_plot.groupby('bin').to_e_coli.min()
+        #     idx = self.df_for_plot.groupby('bin').to_wt.transform(min) == self.df_for_plot['to_wt']
+        #     self.df_for_plot['chosen'] = idx
+        #     plot = ggplot(self.df_for_plot, aes('to_wt', 'to_e_coli', colour='chosen')) + geom_point() + theme_classic()
+        #     return self.df_for_plot[self.df_for_plot.chosen].sort_values('bin')
+        # else:
+        plt.plot(self.df_for_plot.to_wt, self.df_for_plot.to_e_coli, 'ro')
+        plt.xlabel('Levenshtein Distance to WT')
+        plt.ylabel('Levenshtein Distance to E. coli')
+        plt.savefig(output_dir+'/Distance_Plot.pdf')
 
         # print(plot)
 
@@ -823,8 +847,6 @@ class Isoacceptor2(object):
         rows = c[ind]
         self.final_trnas = [read_back[i] for i in rows]
         self.final_trnas = {trna_name: trna for trna_dict in self.final_trnas for trna_name, trna in trna_dict.items()}
-        # print(self.final_trnas)
-        # print(chosen_names)
 
         if log_file:
             log_string = ''

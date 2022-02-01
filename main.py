@@ -63,6 +63,7 @@ if __name__ == '__main__':
                             'tRNA73-76*': 'category'},
                      engine='c')
 
+    df = df[df['Amino Acid'] == args.amino_acid]
     synth_df = synth_clean(args.synth_file)
     iso = Isoacceptor2(synth_df, id_dict, args.amino_acid, df, ac=first_ac, id_part_change=args.id_part_change)
 

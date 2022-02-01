@@ -13,8 +13,7 @@ from scipy.spatial.distance import pdist
 from cleanup import d_loop_align, d_loop_extend
 import random
 import sys
-import pprint
-
+from parallel import max_dist_parallel_memo
 
 # ID elements in the form AlaRS: 2, 3, 5...
 id_df = pd.read_excel('identity_elements.xlsx', index_col=0)
@@ -51,6 +50,12 @@ def open_dict(dictofdicts):
         else:
             new[key] = val
     return new
+
+
+def do(part_list, num_seqs):
+    global memo
+    memo = {}
+    return max_dist_parallel_memo(part_list, num_seqs, memo)
 
 
 # RangeDict data structure can take ranges, or tuples of ranges as keys, and any type as values
@@ -335,15 +340,22 @@ class Isoacceptor2(object):
             clust_dict = {part_type: parts for part_type, parts in clust_dict.items()
                           if part_type not in self.id_parts}
 
-        clust_dict = {part_type: [part for part in parts[:sample_size]]
-                      for part_type, parts in clust_dict.items()
-                      if len(parts) >= 15}
-
         if self.used_parts:
             clust_dict = {part_type: [part
                                       for part in part_list
                                       if part not in self.used_parts[part_type]]
                           for part_type, part_list in clust_dict.items()}
+
+        clust_dict = {part_type: [part for part in parts[:sample_size]]
+                      for part_type, parts in clust_dict.items()
+                      if len(parts) >= 15}
+
+        for part_type, part_list in clust_dict.items():
+            if len(part_list) < sample_size:
+                print('Diversity Calc ' + part_type)
+                sample_parts = part_list[:30]
+                print(sample_parts)
+                clust_dict[part_type] = do(sample_parts, 7)
 
         if self.id_part_change:
             trna_id = [synth for synth in self.synths if synth.name == synth_name][0].trna_id

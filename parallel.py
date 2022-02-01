@@ -1,8 +1,11 @@
 from joblib import Parallel, delayed
 import multiprocessing
-from itertools import islice
+from itertools import islice, combinations
 import os
 import math
+import numpy as np
+from scipy.spatial.distance import pdist
+import distance
 
 
 def chunks(data, num_seqs):
@@ -10,6 +13,11 @@ def chunks(data, num_seqs):
     it = iter(data)
     for i in range(0, len(data), num_seqs):
         yield {k: data[k] for k in islice(it, num_seqs)}
+
+
+def chunks_list(data, chunk_size):
+    for i in range(0, len(data), chunk_size):
+        yield data[i:i + chunk_size]
 
 
 def rnafold(file_name):
@@ -37,3 +45,36 @@ def rnafold_in_parallel(iso2, output_file_stem, ac):
             with open(f_name) as infile:
                 for line in infile:
                     outfile.write(line)
+
+
+def memo_dist(u, v, memo):
+    if frozenset((u[0], v[0])) in memo.keys():
+        return memo[frozenset((u[0], v[0]))]
+    else:
+        dist_ = distance.levenshtein(u[0], v[0])
+        memo[frozenset((u[0], v[0]))] = dist_
+        return dist_
+
+
+def max_dist_parallel_memo(part_list, num_seqs, memo):
+    num_cores = multiprocessing.cpu_count() - 1
+    data = np.matrix([[part.seq] for part in part_list])
+    print(data)
+    c = [list(x) for x in combinations(range(len(data)), num_seqs)]
+    batches = chunks_list(c, math.ceil(len(c) / num_cores))
+
+    def max_dist_memo(indexes):
+        distances = []
+        for i in indexes:
+            distances.append(np.min(pdist(data[i, :], lambda u, v: memo_dist(u, v, memo))))
+        max_dist = max(distances)
+        print(max_dist)
+        inds = [i for i, x in enumerate(distances) if x == max_dist]
+        rows = [indexes[ind] for ind in inds]
+        return (max(distances), [[part_list[j] for j in i] for i in rows])
+
+    processed_list = Parallel(n_jobs=num_cores)(delayed(max_dist_memo)(batch) for batch in batches)
+    processed_list = sorted(processed_list, key=lambda tup: tup[0])
+    final_trnas = processed_list[-1][1][0]
+    return final_trnas
+

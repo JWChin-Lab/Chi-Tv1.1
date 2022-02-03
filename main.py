@@ -34,6 +34,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--select', action='store_true', help='Decides if final selection step occurs')
     parser.add_argument('-n', '--num_iterations', help='Number of times to iterate through Chi-T per synthetase',
                         default=1, type=int)
+    parser.add_argument('-m', '--automatic', help='No user input required', action='store_true')
     args = parser.parse_args()
 
     if args.cervettini_filt and len(args.cervettini_filt) > 4:
@@ -65,48 +66,53 @@ if __name__ == '__main__':
 
     df = df[df['Amino Acid'] == args.amino_acid]
     synth_df = synth_clean(args.synth_file)
-    iso = Isoacceptor2(synth_df, id_dict, args.amino_acid, df, ac=first_ac, id_part_change=args.id_part_change)
+    total_iter = len(args.synth_name)*args.num_iterations
+    iso = Isoacceptor2(synth_df, id_dict, args.amino_acid, df, ac=first_ac, id_part_change=args.id_part_change,
+                       num_iter=total_iter)
 
     for j, synth_name in enumerate(args.synth_name):
 
+        iso.iter_trnas = {}
         with open(log_file, 'a') as f:
             f.write(f'##################################################\n\nChi-T Run for {synth_name}\n')
 
         for i in range(j*args.num_iterations, (j+1)*args.num_iterations):
             with open(log_file, 'a') as f:
-                f.write(f'\n***************************************\n\nIteration {i+1} of {args.num_iterations}\n')
+                f.write(f'\n***************************************\n\nIteration {i+1} of {total_iter}\n')
 
             iso.cluster_parts(args.cluster_parts, synth_name=synth_name, clust_id_parts=False, log_file=log_file,
-                              iteration=i+1)
+                              iteration=i+1, automatic=args.automatic)
             iso.chimera(synth_name, length_filt=args.length_filt, log_file=log_file, iteration=i+1)
-            iso.cervettini_filter(args.output_directory, start_stringency=cf_start, min_stringency=cf_min,
-                                  target=cf_targ, step_size=cf_ss, log_file=log_file)
+            iso.cervettini_filter(args.output_directory, synth_name, iteration=i+1, start_stringency=cf_start,
+                                  min_stringency=cf_min, target=cf_targ, step_size=cf_ss, log_file=log_file)
             iso.store_trnas(f'{args.output_directory}/{synth_name}_initial_iter{i+1}.csv')
 
             print('Folding...')
             rnafold_in_parallel(iso, f'{args.output_directory}/folding/{synth_name}_para_iter{i+1}', first_ac)
             iso.fold_filter(first_ac,
                             f'{args.output_directory}/folding/{synth_name}_para_iter{i+1}_{first_ac}_complete_fold.out',
-                            args.output_directory, log_file=log_file)
+                            args.output_directory, synth_name, iteration=i+1, log_file=log_file)
 
             for ac in args.anticodons[1:]:
+                if not iso.trnas:
+                    break
                 iso.change_ac([ac], synth_name)
                 rnafold_in_parallel(iso, f'{args.output_directory}/folding/{synth_name}_para_iter{i+1}', ac)
 
                 iso.fold_filter(ac, f'{args.output_directory}/folding/{synth_name}_para_iter{i+1}_{ac}_complete_fold.out',
-                                args.output_directory, log_file=log_file)
+                                args.output_directory, synth_name, iteration=i+1, log_file=log_file)
 
-            iso.final_filter(freq_thresh=args.frequency, div_thresh=args.diversity, log_file=log_file)
-            iso.store_trnas(f'{args.output_directory}/{synth_name}_finalfold_iter{i+1}.csv')
+            if iso.trnas:
+                iso.final_filter(freq_thresh=args.frequency, div_thresh=args.diversity, log_file=log_file)
+                iso.store_trnas(f'{args.output_directory}/{synth_name}_finalfold_iter{i+1}.csv')
 
         if args.select:
-            iso.select(synth_name, args.output_directory, log_file=log_file)
+            iso.select(synth_name, args.output_directory, log_file=log_file, automatic=args.automatic)
             iso.store_trnas(f'{args.output_directory}/{synth_name}_selected.csv')
 
         cluster = len(iso.trnas) > 40
         iso.cluster_select(cluster=cluster, log_file=log_file)
 
-        success = False
         try:
             driver = webdriver.Chrome()
             driver.maximize_window()
@@ -143,20 +149,19 @@ if __name__ == '__main__':
         except:
             pass
 
-        while True:
-            accept = input('Use these tRNAs? (y)es or (n)o\n> ')
-            if accept.lower() == 'y':
-                iso.trnas = iso.final_trnas
-                iso.store_trnas(f'{args.output_directory}/{synth_name}_final_four.csv')
-                iso.iter_trnas = {}
-                break
-            elif accept.lower() == 'n':
-                print("Well I dunno man what do you want from me I'm just a machine make your own tRNAs")
-                iso.iter_trnas = {}
-                break
-            else:
-                print('Innapropriate value!')
-                continue
-
-        if success:
-            driver.quit()
+        if not args.automatic:
+            while True:
+                accept = input('Use these tRNAs? (y)es or (n)o\n> ')
+                if accept.lower() == 'y':
+                    driver.quit()
+                    iso.trnas = iso.final_trnas
+                    iso.store_trnas(f'{args.output_directory}/{synth_name}_final_four.csv')
+                    iso.iter_trnas = {}
+                    break
+                elif accept.lower() == 'n':
+                    print("Well I dunno man what do you want from me I'm just a machine make your own tRNAs")
+                    iso.iter_trnas = {}
+                    break
+                else:
+                    print('Innapropriate value!')
+                    continue

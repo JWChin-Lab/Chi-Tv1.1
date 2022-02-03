@@ -7,16 +7,18 @@ import distance
 from itertools import product, chain, islice, combinations
 import time
 import ast
-from plotnine import ggplot, aes, geom_point, theme_classic
 from matplotlib import pyplot as plt
 from scipy.spatial.distance import pdist
 from cleanup import d_loop_align, d_loop_extend
 import random
 import sys
 from parallel import max_dist_parallel_memo
+import math
+
 
 # ID elements in the form AlaRS: 2, 3, 5...
 id_df = pd.read_excel('identity_elements.xlsx', index_col=0)
+
 # Remove anticodon identity elements - these are changing anyway
 id_dict = {index[:3]: {int(val): set() for val in value.strip().split(', ') if int(val) not in {34, 35, 36}}
            for index, value in zip(id_df.index, id_df.iloc[:, 0])}
@@ -27,6 +29,7 @@ col_dict = {f'Unnamed: {i}': f'VL{j}'
             for i, j in zip(range(51, 68), range(1, 18))}
 ecoli_df = ecoli_df.rename(columns={'Unnamed: 1': 'AC', 'Unnamed: 9': '7a', 'Unnamed: 88': '65a'})
 ecoli_df = ecoli_df.rename(columns=col_dict)
+
 # Fill id_dict with bases at ID positions
 for aa_, ids in id_dict.items():
     for pos_, bases in ids.items():
@@ -50,12 +53,6 @@ def open_dict(dictofdicts):
         else:
             new[key] = val
     return new
-
-
-def do(part_list, num_seqs):
-    global memo
-    memo = {}
-    return max_dist_parallel_memo(part_list, num_seqs, memo)
 
 
 # RangeDict data structure can take ranges, or tuples of ranges as keys, and any type as values
@@ -121,6 +118,7 @@ class Synthetase2(object):
     found at the corresponding tRNA - "TA\""""
 
     def __init__(self, name, syn_id, trna_id, gen_id, aa, id_parts, iso, huge_df):
+
         self.name = name
         self.syn_id = syn_id
         self.trna_id = trna_id
@@ -130,9 +128,9 @@ class Synthetase2(object):
         self.iso = iso
         self.huge_df = huge_df
         self.non_id_parts = [part_type for part_type in base_to_part_2.values() if part_type not in self.id_parts]
-
         self.id_seqs = {}
         self.non_id_seqs = {}
+
         for part in base_to_part_2.values():
             if part in self.id_parts:
                 try:
@@ -157,18 +155,6 @@ class Synthetase2(object):
                 except IndexError:
                     pass
 
-        # for id_part in self.id_parts:
-        #     try:
-        #         seq = self.huge_df[self.huge_df.seq_id == self.trna_id].iloc[0][id_part]
-        #         if id_part != 'tRNA14-21_54-60*':
-        #             align = seq
-        #         else:
-        #             align = self.huge_df[self.huge_df.seq_id == self.trna_id].iloc[0]['tRNA14-21_54-60* aligned']
-        #         self.id_seqs[id_part] = Part2(seq, id_part, self.aa, self.trna_id, align, self.iso)
-        #
-        #     except IndexError:
-        #         pass
-
 
 ###################################################################################################################
 
@@ -182,7 +168,10 @@ class Isoacceptor2(object):
     to be handled by this class, as will want to cluster once again to cover largest sequence diversity of
     designed tRNAs."""
 
-    def __init__(self, synth_df, id_dict, aa, huge_df, ac='CTA', comp_arm_strict=True, v_loop_length=7, id_part_change=None):
+    def __init__(self, synth_df, id_dict, aa, huge_df, ac='CTA', comp_arm_strict=True, v_loop_length=7, id_part_change=None,
+                 num_iter=1):
+
+        self.num_iter = num_iter
 
         # id_dict for instance just takes ID elements for defined isoacceptor class
         self.exemplar_parts = None
@@ -228,6 +217,8 @@ class Isoacceptor2(object):
         self.huge_df = huge_df
         self.trnas = dict()
         self.used_parts = {}
+
+        # Holds all tRNAs from each iteration
         self.iter_trnas = {}
 
         self.comp_arm_strict = comp_arm_strict
@@ -246,6 +237,7 @@ class Isoacceptor2(object):
         # is for D-loop, which has a sequence and an aligned sequence - just easier to make all parts have both
         part_tuple = namedtuple('Part_tuple', ['seq', 'align'])
         self.all_parts = {}
+
         # Cut down dataframe to just sequences within isoacceptor class
         amino_df = self.huge_df[self.huge_df['Amino Acid'] == self.aa]
 
@@ -319,7 +311,8 @@ class Isoacceptor2(object):
 
     #######################
 
-    def cluster_parts(self, sample_size, synth_name, clust_id_parts=False, display=False, log_file=None, iteration=1):
+    def cluster_parts(self, sample_size, synth_name, clust_id_parts=False, display=False, log_file=None, iteration=1,
+                      automatic=False):
 
         """This method uses Levenshtein distance between sequences and affinity propagation to cluster parts.
         Clustering could be optimised. For maximum sample size, parameters have been adjusted to:
@@ -335,28 +328,37 @@ class Isoacceptor2(object):
         now = time.time()
         print('Clustering Parts...')
         clust_dict = self.all_parts
+        self.exemplar_parts = {}
+        iter_remain = self.num_iter - iteration + 1
 
+        # Remove ID parts from clust dict
         if not clust_id_parts:
             clust_dict = {part_type: parts for part_type, parts in clust_dict.items()
                           if part_type not in self.id_parts}
 
+        # Remove Used parts from clust_dict
         if self.used_parts:
             clust_dict = {part_type: [part
                                       for part in part_list
                                       if part not in self.used_parts[part_type]]
                           for part_type, part_list in clust_dict.items()}
 
+        for part_type, part_list in clust_dict.items():
+            if len(part_list) < sample_size and part_type != 'tRNA8-9*':
+                print('Diversity Calc ' + part_type)
+                num_seqs_for_part = math.floor(len(part_list)/iter_remain)
+                sample_parts = part_list[:30]
+                diverse_seqs = max_dist_parallel_memo(sample_parts, min([num_seqs_for_part, 7]))
+                for part in part_list:
+                    if part.seq in diverse_seqs:
+                        part.exemplar = iteration
+
+        # Take top parts
         clust_dict = {part_type: [part for part in parts[:sample_size]]
                       for part_type, parts in clust_dict.items()
-                      if len(parts) >= 15}
+                      if len(parts) >= sample_size}
 
-        for part_type, part_list in clust_dict.items():
-            if len(part_list) < sample_size:
-                print('Diversity Calc ' + part_type)
-                sample_parts = part_list[:30]
-                print(sample_parts)
-                clust_dict[part_type] = do(sample_parts, 7)
-
+        # Randomise ID parts specified maintaining ID element
         if self.id_part_change:
             trna_id = [synth for synth in self.synths if synth.name == synth_name][0].trna_id
             trna = self.huge_df[self.huge_df.seq_id == trna_id]
@@ -373,6 +375,7 @@ class Isoacceptor2(object):
                         new_list.append(part)
                 clust_dict[part_type] = new_list
 
+        # Make all low numbered part types exemplars
         for part_type, parts in self.all_parts.items():
             if len(parts) < 15:
                 for i, part in enumerate(parts):
@@ -397,9 +400,6 @@ class Isoacceptor2(object):
             # Form full matrix by adding to transpose
             m = (m + m.T) * -1
 
-            #     lev_similarity = -1*np.array([[distance.levenshtein(w1,w2) for w1 in sample] for w2 in sample])
-            #     affprop.fit(lev_similarity)
-
             # Magic cluster model
             affprop = AffinityPropagation(affinity="precomputed", damping=0.8, max_iter=1000, random_state=None)
             affprop.fit(m)
@@ -418,9 +418,13 @@ class Isoacceptor2(object):
                     cluster_str = ", ".join(cluster)
                     print(f"{part_type}: ID - {cluster_id}: *{exemplar}* {cluster_str}")
 
-        self.exemplar_parts = {part_type: [part for part in part_list if part.exemplar in ['all', iteration]]
-                               for part_type, part_list in self.all_parts.items()
-                               if part_type not in self.id_parts}
+        # self.exemplar_parts = {part_type: [part for part in part_list if part.exemplar in ['all', iteration]]
+        #                        for part_type, part_list in self.all_parts.items()
+        #                        if part_type not in self.id_parts}
+
+        for part_type, part_list in self.all_parts.items():
+            if part_type not in self.id_parts and part_type not in self.exemplar_parts.keys():
+                self.exemplar_parts[part_type] = [part for part in part_list if part.exemplar in ['all', iteration]]
 
         for part_type, part_list in self.exemplar_parts.items():
             if part_type in self.used_parts.keys():
@@ -432,24 +436,25 @@ class Isoacceptor2(object):
                        for part_type, part_list in self.exemplar_parts.items()])
         print(f'Estimated Chimeras: {est}')
 
-        while True:
-            size_ans = input('Continue? (y) or (n):\n')
-            if size_ans.lower() == 'y':
-                break
-            elif size_ans.lower() == 'n':
-                print(f'Consider changing sample size for clustering.\n Current sample size is {sample_size}\n')
-                while True:
-                    size_ans_ = input("Enter new sample size or 'q' to quit\n> ")
-                    if size_ans_.lower() == 'q':
-                        print('Thank you for trying Chi-T!')
-                        sys.exit()
-                    else:
-                        try:
-                            new_size = int(size_ans_)
-                            self.cluster_parts(new_size, synth_name)
-                        except ValueError:
-                            print('Inappropriate value!')
-                            continue
+        if not automatic:
+            while True:
+                size_ans = input('Continue? (y) or (n):\n')
+                if size_ans.lower() == 'y':
+                    break
+                elif size_ans.lower() == 'n':
+                    print(f'Consider changing sample size for clustering.\n Current sample size is {sample_size}\n')
+                    while True:
+                        size_ans_ = input("Enter new sample size or 'q' to quit\n> ")
+                        if size_ans_.lower() == 'q':
+                            print('Thank you for trying Chi-T!')
+                            sys.exit()
+                        else:
+                            try:
+                                new_size = int(size_ans_)
+                                self.cluster_parts(new_size, synth_name)
+                            except ValueError:
+                                print('Inappropriate value!')
+                                continue
 
         print(f'Parts Clustered!...Time elapsed: {time.time() - now}')
 
@@ -511,8 +516,8 @@ class Isoacceptor2(object):
 
     ##############################
 
-    def cervettini_filter(self, output_dir, start_stringency=0.5, min_stringency=0, target=1500000, step_size=0.05,
-                          log_file=None):
+    def cervettini_filter(self, output_dir, synth_name, iteration=1,
+                          start_stringency=0.5, min_stringency=0, target=1500000, step_size=0.05, log_file=None):
         """Applies the scoring from Cervettini et al., 2020 then filters.
         Filtering applied iteratively until target sequence number reached.
         start_stringency determines initial filtering threshold for max score across any isoacceptor.
@@ -528,7 +533,8 @@ class Isoacceptor2(object):
         plt.hist(cscores, bins=[i for i in np.arange(-1, 1, 0.05)])
         plt.ylabel('Count')
         plt.xlabel('Cervettini Score')
-        plt.savefig(output_dir+'/cscores.pdf')
+        plt.savefig(output_dir+f'/cscores_{synth_name}_iter{iteration}.pdf')
+        plt.clf()
         print(f'Filtering tRNAs...Time Elapsed: {time.time() - now}')
         stringency = start_stringency
         log_string = 'Cervettini Filtering: \n'
@@ -628,7 +634,7 @@ class Isoacceptor2(object):
 
     ###############################
 
-    def fold_filter(self, ac, fold_file, output_dir, freq_thresh=0.15, div_thresh=10, inplace=True,
+    def fold_filter(self, ac, fold_file, output_dir, synth_name, iteration=1, freq_thresh=0.3, div_thresh=10, inplace=True,
                     pattern=trna_pattern, log_file=None):
 
         """Filters RNAfold output.
@@ -668,7 +674,8 @@ class Isoacceptor2(object):
         ax1.set_title('Diversity')
         ax2.hist(freqs, bins=np.arange(0, 1, 0.01))
         ax2.set_title('Frequency')
-        fig.savefig(output_dir+f'/structure_{ac}.pdf')
+        fig.savefig(output_dir+f'/structure_{synth_name}_{iteration}_{ac}.pdf')
+        plt.clf()
 
         filt_data = {seq_name: trna for seq_name, trna in self.trnas.items()
                      if pattern.match(trna.struct[ac])
@@ -761,7 +768,7 @@ class Isoacceptor2(object):
 
     ########################################
 
-    def select(self, synth_name, output_dir, advice=False, num_seqs=4, manual_filt=True, log_file=None):
+    def select(self, synth_name, output_dir, automatic=False, log_file=None):
 
         """Selection step.
         Method calculates levenshtein distance between the tRNA and the native tRNA for this synthetase.
@@ -797,9 +804,10 @@ class Isoacceptor2(object):
         plt.plot(self.df_for_plot.to_wt, self.df_for_plot.to_e_coli, 'ro')
         plt.xlabel('Levenshtein Distance to WT')
         plt.ylabel('Levenshtein Distance to E. coli')
-        plt.savefig(output_dir+'/Distance_Plot.pdf')
+        plt.savefig(output_dir+f'/Distance_Plot_{synth_name}.pdf')
+        plt.clf()
 
-        if manual_filt:
+        if not automatic:
             while True:
                 user = input("Cut-off point for distance to native ('x' for exit)\n>  ")
                 if user.lower() == 'x':
@@ -823,8 +831,22 @@ class Isoacceptor2(object):
                     except:
                         print('Inappropriate value!')
                         continue
+        else:
+            for i in range(10, 30):
+                cutoff = i
+                poss = {name: trna for name, trna in self.trnas.items() if trna.nat_lev_dist <= cutoff}
+                if len(poss) < 200:
+                    n = 200 - len(poss)
+                else:
+                    n_ = abs(200 - len(poss))
+                    if n_ <= n:
+                        self.trnas = poss
+                    else:
+                        cutoff = i - 1
+                        self.trnas = {name: trna for name, trna in self.trnas.items() if trna.nat_lev_dist <= cutoff}
+                    break
 
-        if log_file and manual_filt:
+        if log_file:
             with open(log_file, 'a') as f:
                 f.write(f'Selected {len(self.trnas)} Chimeras with maximum distance to WT {cutoff}\n')
             # self.df_for_plot = self.df_for_plot[self.df_for_plot.to_wt < cutoff]

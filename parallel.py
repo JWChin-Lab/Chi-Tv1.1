@@ -6,6 +6,7 @@ import math
 import numpy as np
 from scipy.spatial.distance import pdist
 import distance
+import gc
 
 
 def chunks(data, num_seqs):
@@ -16,9 +17,7 @@ def chunks(data, num_seqs):
 
 
 def chunks_list(data, chunk_size):
-    for i in range(0, len(data), chunk_size):
-        yield data[i:i + chunk_size]
-
+    return [data[i:i + chunk_size] for i in range(0, len(data), chunk_size)]
 
 def rnafold(file_name):
     cmd = f'RNAfold -p -d2 --noLP --noPS --noDP < {file_name} > {file_name[:-3]}_fold.out'
@@ -56,25 +55,29 @@ def memo_dist(u, v, memo):
         return dist_
 
 
-def max_dist_parallel_memo(part_list, num_seqs, memo):
+def max_dist_parallel_memo(part_list, num_seqs):
     num_cores = multiprocessing.cpu_count() - 1
-    data = np.matrix([[part.seq] for part in part_list])
-    print(data)
-    c = [list(x) for x in combinations(range(len(data)), num_seqs)]
+    seqs = [[part.seq] for part in part_list]
+    c = [list(x) for x in combinations(seqs, num_seqs)]
     batches = chunks_list(c, math.ceil(len(c) / num_cores))
+    # print(gc.get_count())
+    # gc.collect()
+    # print(gc.get_count())
 
-    def max_dist_memo(indexes):
+    def max_dist_memo(batch):
+        memo = {}
         distances = []
-        for i in indexes:
-            distances.append(np.min(pdist(data[i, :], lambda u, v: memo_dist(u, v, memo))))
+        for i in batch:
+            distances.append(np.min(pdist(i, lambda u, v: memo_dist(u, v, memo))))
         max_dist = max(distances)
-        print(max_dist)
         inds = [i for i, x in enumerate(distances) if x == max_dist]
-        rows = [indexes[ind] for ind in inds]
-        return (max(distances), [[part_list[j] for j in i] for i in rows])
+        rows = [batch[ind] for ind in inds]
+        # gc.collect()
+        return (max_dist, rows)
 
-    processed_list = Parallel(n_jobs=num_cores)(delayed(max_dist_memo)(batch) for batch in batches)
+    processed_list = Parallel(n_jobs=num_cores, backend='loky')(delayed(max_dist_memo)(batch) for batch in batches)
     processed_list = sorted(processed_list, key=lambda tup: tup[0])
     final_trnas = processed_list[-1][1][0]
+    final_trnas = [seq for seq_list in final_trnas for seq in seq_list]
     return final_trnas
 

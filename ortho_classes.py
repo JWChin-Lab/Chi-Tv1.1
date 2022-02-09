@@ -15,7 +15,6 @@ import sys
 from parallel import max_dist_parallel_memo
 import math
 
-
 # ID elements in the form AlaRS: 2, 3, 5...
 id_df = pd.read_excel('identity_elements.xlsx', index_col=0)
 
@@ -168,10 +167,11 @@ class Isoacceptor2(object):
     to be handled by this class, as will want to cluster once again to cover largest sequence diversity of
     designed tRNAs."""
 
-    def __init__(self, synth_df, id_dict, aa, huge_df, ac='CTA', comp_arm_strict=True, v_loop_length=7, id_part_change=None,
-                 num_iter=1):
+    def __init__(self, synth_df, id_dict, aa, huge_df, ac='CTA', comp_arm_strict=True, v_loop_length=7,
+                 id_part_change=None, num_iter=1, reference=None):
 
         self.num_iter = num_iter
+        self.reference = reference
 
         # id_dict for instance just takes ID elements for defined isoacceptor class
         self.exemplar_parts = None
@@ -308,11 +308,23 @@ class Isoacceptor2(object):
             part_list.sort()
 
         self.folded = {}
+        self.low_part_types = []
+
+        if self.reference:
+            ref_df = pd.read_csv(self.reference, header=None)
+            self.reference_trna = {'tRNA1-7_66-72*': ref_df.iloc[0, 0] + '_' + ref_df.iloc[0, 13],
+                                   'tRNA8-9*': ref_df.iloc[0, 1],
+                                   'tRNA10-13_22-25*': ref_df.iloc[0, 2] + '_' + ref_df.iloc[0, 4],
+                                   'tRNA14-21_54-60*': ref_df.iloc[0, 3] + '_' + ref_df.iloc[0, 11],
+                                   'tRNA26_44-48*': ref_df.iloc[0, 5] + '_' + ref_df.iloc[0, 9],
+                                   'tRNA27-31_39-43*': ref_df.iloc[0, 6] + '_' + ref_df.iloc[0, 8],
+                                   'tRNA32-38*': ref_df.iloc[0, 7],
+                                   'tRNA49-53_61-65*': ref_df.iloc[0, 10] + '_' + ref_df.iloc[0, 12]}
 
     #######################
 
     def cluster_parts(self, sample_size, synth_name, clust_id_parts=False, display=False, log_file=None, iteration=1,
-                      automatic=False):
+                      automatic=False, clust_size_min=None, subtle=False):
 
         """This method uses Levenshtein distance between sequences and affinity propagation to cluster parts.
         Clustering could be optimised. For maximum sample size, parameters have been adjusted to:
@@ -330,33 +342,13 @@ class Isoacceptor2(object):
         clust_dict = self.all_parts
         self.exemplar_parts = {}
         iter_remain = self.num_iter - iteration + 1
+        if not clust_size_min:
+            clust_size_min = sample_size
 
         # Remove ID parts from clust dict
         if not clust_id_parts:
             clust_dict = {part_type: parts for part_type, parts in clust_dict.items()
                           if part_type not in self.id_parts}
-
-        # Remove Used parts from clust_dict
-        if self.used_parts:
-            clust_dict = {part_type: [part
-                                      for part in part_list
-                                      if part not in self.used_parts[part_type]]
-                          for part_type, part_list in clust_dict.items()}
-
-        for part_type, part_list in clust_dict.items():
-            if len(part_list) < sample_size and part_type != 'tRNA8-9*':
-                print('Diversity Calc ' + part_type)
-                num_seqs_for_part = math.floor(len(part_list)/iter_remain)
-                sample_parts = part_list[:30]
-                diverse_seqs = max_dist_parallel_memo(sample_parts, min([num_seqs_for_part, 7]))
-                for part in part_list:
-                    if part.seq in diverse_seqs:
-                        part.exemplar = iteration
-
-        # Take top parts
-        clust_dict = {part_type: [part for part in parts[:sample_size]]
-                      for part_type, parts in clust_dict.items()
-                      if len(parts) >= sample_size}
 
         # Randomise ID parts specified maintaining ID element
         if self.id_part_change:
@@ -375,12 +367,54 @@ class Isoacceptor2(object):
                         new_list.append(part)
                 clust_dict[part_type] = new_list
 
+        # Remove Used parts from clust_dict
+        if self.used_parts:
+            clust_dict = {part_type: [part
+                                      for part in part_list
+                                      if part not in self.used_parts[part_type]]
+                          for part_type, part_list in clust_dict.items()}
+
+        part_dist_dict = {'tRNA1-7_66-72*': 2, 'tRNA10-13_22-25*': 2, 'tRNA14-21_54-60*': 2, 'tRNA26_44-48*': 1,
+                          'tRNA27-31_39-43*': 2, 'tRNA49-53_61-65*': 2, 'tRNA8-9*': 2, 'tRNA32-38*': 1}
+
+        if subtle:
+            if not self.reference:
+                trna_id = [synth for synth in self.synths if synth.name == synth_name][0].trna_id
+                trna = self.huge_df[self.huge_df.seq_id == trna_id]
+            for part_type in clust_dict.keys():
+                new_parts = []
+                if not self.reference:
+                    trna_part_seq = list(trna[part_type])[0]
+                else:
+                    trna_part_seq = self.reference_trna[part_type]
+                for part in clust_dict[part_type]:
+                    if distance.levenshtein(part.seq, trna_part_seq) <= part_dist_dict[part_type]:
+                        new_parts.append(part)
+                clust_dict[part_type] = new_parts
+
         # Make all low numbered part types exemplars
-        for part_type, parts in self.all_parts.items():
-            if len(parts) < 15:
-                for i, part in enumerate(parts):
-                    part.cluster_id = i
-                    part.exemplar = 'all'
+        if iteration == 1:
+            for part_type, parts in clust_dict.items():
+                if len(parts) < 15:
+                    self.low_part_types.append(part_type)
+                    for i, part in enumerate(parts):
+                        part.cluster_id = i
+                        part.exemplar = 'all'
+
+        for part_type, part_list in clust_dict.items():
+            if len(part_list) < clust_size_min and part_type not in self.low_part_types:  # and part_type != 'tRNA8-9*':
+                print('Diversity Calculation ' + part_type)
+                num_seqs_for_part = math.floor(len(part_list) / iter_remain)
+                sample_parts = part_list[:30]
+                diverse_seqs = max_dist_parallel_memo(sample_parts, min([num_seqs_for_part, 7]))
+                for part in part_list:
+                    if part.seq in diverse_seqs and part.exemplar != 'all':
+                        part.exemplar = iteration
+
+        # Take top parts
+        clust_dict = {part_type: [part for part in parts[:sample_size]]
+                      for part_type, parts in clust_dict.items()
+                      if len(parts) >= clust_size_min}
 
         if log_file:
             with open(log_file, 'a') as f:
@@ -460,7 +494,7 @@ class Isoacceptor2(object):
 
     ###########################
 
-    def chimera(self, synth_name, length_filt=True, log_file=None, iteration=1):
+    def chimera(self, synth_name, length_filt=79, log_file=None, iteration=1):
         """Generates all possible chimeras from ID parts and exemplar parts"""
         count = 0
 
@@ -505,12 +539,12 @@ class Isoacceptor2(object):
                 print(f'{count} chimeras made...Time Elapsed: {time.time() - now}')
         self.trnas = self.trnas_
         if length_filt:
-            self.trnas = {name: trna for name, trna in self.trnas.items() if len(trna.seq[self.ac]) < 79}
+            self.trnas = {name: trna for name, trna in self.trnas.items() if len(trna.seq[self.ac]) < length_filt}
         if log_file:
             with open(log_file, 'a') as f:
                 f.write(f'Unfiltered Chimeras: {len(self.trnas_)}\n')
                 if length_filt:
-                    f.write(f'Length Filtered Chimeras: {len(self.trnas)}\n')
+                    f.write(f'Length (<{length_filt}) Filtered Chimeras: {len(self.trnas)}\n')
 
         print(f'{len(self.trnas)} Chimeras Made!...Time Elapsed: {time.time() - now}')
 
@@ -533,7 +567,7 @@ class Isoacceptor2(object):
         plt.hist(cscores, bins=[i for i in np.arange(-1, 1, 0.05)])
         plt.ylabel('Count')
         plt.xlabel('Cervettini Score')
-        plt.savefig(output_dir+f'/cscores_{synth_name}_iter{iteration}.pdf')
+        plt.savefig(output_dir + f'/cscores_{synth_name}_iter{iteration}.pdf')
         plt.clf()
         print(f'Filtering tRNAs...Time Elapsed: {time.time() - now}')
         stringency = start_stringency
@@ -634,8 +668,8 @@ class Isoacceptor2(object):
 
     ###############################
 
-    def fold_filter(self, ac, fold_file, output_dir, synth_name, iteration=1, freq_thresh=0.3, div_thresh=10, inplace=True,
-                    pattern=trna_pattern, log_file=None):
+    def fold_filter(self, ac, fold_file, output_dir, synth_name, iteration=1, freq_thresh=0.3, div_thresh=10,
+                    inplace=True, pattern=trna_pattern, log_file=None):
 
         """Filters RNAfold output.
         ac is important to save information to correct dictionary key.
@@ -674,7 +708,7 @@ class Isoacceptor2(object):
         ax1.set_title('Diversity')
         ax2.hist(freqs, bins=np.arange(0, 1, 0.01))
         ax2.set_title('Frequency')
-        fig.savefig(output_dir+f'/structure_{synth_name}_{iteration}_{ac}.pdf')
+        fig.savefig(output_dir + f'/structure_{synth_name}_{iteration}_{ac}.pdf')
         plt.clf()
 
         filt_data = {seq_name: trna for seq_name, trna in self.trnas.items()
@@ -768,7 +802,7 @@ class Isoacceptor2(object):
 
     ########################################
 
-    def select(self, synth_name, output_dir, automatic=False, log_file=None):
+    def select(self, synth_name, output_dir, automatic=False, log_file=None, subtle=False):
 
         """Selection step.
         Method calculates levenshtein distance between the tRNA and the native tRNA for this synthetase.
@@ -804,7 +838,7 @@ class Isoacceptor2(object):
         plt.plot(self.df_for_plot.to_wt, self.df_for_plot.to_e_coli, 'ro')
         plt.xlabel('Levenshtein Distance to WT')
         plt.ylabel('Levenshtein Distance to E. coli')
-        plt.savefig(output_dir+f'/Distance_Plot_{synth_name}.pdf')
+        plt.savefig(output_dir + f'/Distance_Plot_{synth_name}.pdf')
         plt.clf()
 
         if not automatic:
@@ -832,11 +866,17 @@ class Isoacceptor2(object):
                         print('Inappropriate value!')
                         continue
         else:
-            for i in range(10, 30):
+            if subtle:
+                start = 1
+                end = 5
+            else:
+                start = 5
+                end = 30
+            for index, i in enumerate(range(start, end)):
                 cutoff = i
                 poss = {name: trna for name, trna in self.trnas.items() if trna.nat_lev_dist <= cutoff}
-                if len(poss) < 200:
-                    n = 200 - len(poss)
+                if len(poss) < 200 or index == 0:
+                    n = abs(200 - len(poss))
                 else:
                     n_ = abs(200 - len(poss))
                     if n_ <= n:
@@ -908,14 +948,18 @@ class Isoacceptor2(object):
 
         print(f'{len(self.exemplar_trnas)} exemplars chosen...Maximising diversity...Time elapsed: {time.time() - now}')
 
-        c = [list(x) for x in combinations(range(len(data)), num_seqs)]
-        distances = []
-        for i in c:
-            distances.append(np.min(pdist(data[i, :], lambda u, v: distance.levenshtein(u[0], v[0]))))
-        ind = distances.index(max(distances))
-        rows = c[ind]
-        self.final_trnas = [read_back[i] for i in rows]
-        self.final_trnas = {trna_name: trna for trna_dict in self.final_trnas for trna_name, trna in trna_dict.items()}
+        if num_seqs < len(self.exemplar_trnas):
+            c = [list(x) for x in combinations(range(len(data)), num_seqs)]
+            distances = []
+            for i in c:
+                distances.append(np.min(pdist(data[i, :], lambda u, v: distance.levenshtein(u[0], v[0]))))
+            ind = distances.index(max(distances))
+            rows = c[ind]
+            self.final_trnas = [read_back[i] for i in rows]
+            self.final_trnas = {trna_name: trna for trna_dict in self.final_trnas for trna_name, trna in trna_dict.items()}
+        else:
+            distances = []
+            self.final_trnas = self.exemplar_trnas
 
         if log_file:
             log_string = ''
@@ -923,11 +967,15 @@ class Isoacceptor2(object):
                 log_string += f">{trna_name}\n{trna.seq['CTA']}\n{trna.struct['CTA']}\n" \
                               f"Frequency: {trna.freq['CTA']} Diversity: {trna.div['CTA']}\n"
             with open(log_file, 'a') as f:
-                f.write(f'{num_seqs} Chimeras Chosen:\nMinimum Distance: {max(distances)}\n' + log_string)
+                f.write(f'{num_seqs} Chimeras Chosen\n')
+                if distances:
+                    f.write(f'Minimum Distance: {max(distances)}\n')
+                f.write(log_string)
         print(f'Designs Finished!...Time Elapsed: {time.time() - now}')
 
         # if inplace:
         #     self.trnas = {name: trna for name, trna in self.exemplar_trnas.items() if name in chosen_names}
+
 
 ###################################################################################################################
 
@@ -996,7 +1044,11 @@ class Part2(object):
                 self.seq_dict[46] = '-'
 
         else:
-            self.seq_dict = {i: base for i, base in zip(self.base_range, self.aligned)}
+            try:
+                self.seq_dict = {i: base for i, base in zip(self.base_range, self.aligned)}
+            except:
+                print(f'seq: {self.seq} align: {self.aligned} region: {self.region} base_range: {self.base_range}')
+                raise Exception
 
         # id_dict is not associated with the class, but defined outside
         self.id_d = {aa: {pos: base for pos, base in d.items() if pos in self.base_range} for aa, d in id_dict.items()}
@@ -1055,7 +1107,9 @@ class Part2(object):
             else:
                 part_1_align = d_loop_extend(part_1_seq)
                 part_1_align = d_loop_align(part_1_align)
-            #                 part_1_align = huge_df[huge_df['tRNA14-21*'] == part_1_seq].iloc[0]['tRNA14-21* aligned']
+                # Some manually input parts don't align, so need to do slower dataframe lookup
+                if part_1_align is np.nan:
+                    part_1_align = self.iso.huge_df[self.iso.huge_df['tRNA14-21*'] == part_1_seq].iloc[0]['tRNA14-21* aligned']
 
             self.sub_parts = {part_type_1: SubPart(part_1_seq, part_type_1, self.aa,
                                                    self.trna_id, part_1_align, self, self.iso),
@@ -1090,6 +1144,7 @@ class Part2(object):
     def __lt__(self, other):
         """less than dunder method required for sorting all_parts by score"""
         return self.id_score < other.id_score
+
 
 ###################################################################################################################
 

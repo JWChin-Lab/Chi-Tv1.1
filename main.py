@@ -23,7 +23,13 @@ if __name__ == '__main__':
                         nargs='+')
     parser.add_argument("-cp", "--cluster_parts", type=int,
                         help='Number of parts for each part type to cluster', default=200)
-    parser.add_argument("-l", "--length_filt", action="store_true", help='Filter chimeras if longer than 78 nts')
+    parser.add_argument("-cm", "--cluster_min", type=int, help="Minimum number of remaining parts for clustering.",
+                        default=60)
+    parser.add_argument('-s', '--subtle', help="If true, only parts <=2 mutations away from the native sequence are chosen",
+                        action='store_true')
+    parser.add_argument('-r', '--reference', help='If using subtle mode, this is the reference tRNA')
+    parser.add_argument("-l", "--length_filt", help='Filter chimeras if 79 nts or longer (or specified value)',
+                        nargs='?', const=79, type=int)
     parser.add_argument("-cf", "--cervettini_filt", nargs='+', help='Parameters for Cervettini Filtering in order '
                                                                     'start_stringency, minimum_stringency, target '
                                                                     'number of chimeras, and step size',
@@ -31,10 +37,11 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--anticodons', nargs='+', help='Anticodons to iterate through')
     parser.add_argument('-f', '--frequency', help='Minimum frequency for first anticodon.', default=0.3, type=float)
     parser.add_argument('-d', '--diversity', help='Maximum diversity for first anticodon.', default=5.0, type=float)
-    parser.add_argument('-s', '--select', action='store_true', help='Decides if final selection step occurs')
     parser.add_argument('-n', '--num_iterations', help='Number of times to iterate through Chi-T per synthetase',
                         default=1, type=int)
     parser.add_argument('-m', '--automatic', help='No user input required', action='store_true')
+    parser.add_argument('-i', '--initial', help='If true, save initial chimeras to csv (only if needed for analysis)',
+                        action='store_true')
     args = parser.parse_args()
 
     if args.cervettini_filt and len(args.cervettini_filt) > 4:
@@ -68,7 +75,7 @@ if __name__ == '__main__':
     synth_df = synth_clean(args.synth_file)
     total_iter = len(args.synth_name)*args.num_iterations
     iso = Isoacceptor2(synth_df, id_dict, args.amino_acid, df, ac=first_ac, id_part_change=args.id_part_change,
-                       num_iter=total_iter)
+                       num_iter=total_iter, reference=args.reference)
 
     for j, synth_name in enumerate(args.synth_name):
 
@@ -81,11 +88,13 @@ if __name__ == '__main__':
                 f.write(f'\n***************************************\n\nIteration {i+1} of {total_iter}\n')
 
             iso.cluster_parts(args.cluster_parts, synth_name=synth_name, clust_id_parts=False, log_file=log_file,
-                              iteration=i+1, automatic=args.automatic)
+                              iteration=i+1, automatic=args.automatic, clust_size_min=args.cluster_min,
+                              subtle=args.subtle)
             iso.chimera(synth_name, length_filt=args.length_filt, log_file=log_file, iteration=i+1)
             iso.cervettini_filter(args.output_directory, synth_name, iteration=i+1, start_stringency=cf_start,
                                   min_stringency=cf_min, target=cf_targ, step_size=cf_ss, log_file=log_file)
-            iso.store_trnas(f'{args.output_directory}/{synth_name}_initial_iter{i+1}.csv')
+            if args.initial:
+                iso.store_trnas(f'{args.output_directory}/{synth_name}_initial_iter{i+1}.csv')
 
             print('Folding...')
             rnafold_in_parallel(iso, f'{args.output_directory}/folding/{synth_name}_para_iter{i+1}', first_ac)
@@ -103,12 +112,12 @@ if __name__ == '__main__':
                                 args.output_directory, synth_name, iteration=i+1, log_file=log_file)
 
             if iso.trnas:
-                iso.final_filter(freq_thresh=args.frequency, div_thresh=args.diversity, log_file=log_file)
+                iso.final_filter(freq_thresh=args.frequency, div_thresh=args.diversity, percentile_out=0,
+                                 log_file=log_file)
                 iso.store_trnas(f'{args.output_directory}/{synth_name}_finalfold_iter{i+1}.csv')
 
-        if args.select:
-            iso.select(synth_name, args.output_directory, log_file=log_file, automatic=args.automatic)
-            iso.store_trnas(f'{args.output_directory}/{synth_name}_selected.csv')
+        iso.select(synth_name, args.output_directory, log_file=log_file, automatic=args.automatic)
+        iso.store_trnas(f'{args.output_directory}/{synth_name}_selected.csv')
 
         cluster = len(iso.trnas) > 40
         iso.cluster_select(cluster=cluster, log_file=log_file)
@@ -153,7 +162,6 @@ if __name__ == '__main__':
             while True:
                 accept = input('Use these tRNAs? (y)es or (n)o\n> ')
                 if accept.lower() == 'y':
-                    driver.quit()
                     iso.trnas = iso.final_trnas
                     iso.store_trnas(f'{args.output_directory}/{synth_name}_final_four.csv')
                     iso.iter_trnas = {}

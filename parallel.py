@@ -6,7 +6,7 @@ import math
 import numpy as np
 from scipy.spatial.distance import pdist
 import distance
-import gc
+import random
 
 
 def chunks(data, num_seqs):
@@ -60,9 +60,6 @@ def max_dist_parallel_memo(part_list, num_seqs):
     seqs = [[part.seq] for part in part_list]
     c = [list(x) for x in combinations(seqs, num_seqs)]
     batches = chunks_list(c, math.ceil(len(c) / num_cores))
-    # print(gc.get_count())
-    # gc.collect()
-    # print(gc.get_count())
 
     def max_dist_memo(batch):
         memo = {}
@@ -72,12 +69,11 @@ def max_dist_parallel_memo(part_list, num_seqs):
         max_dist = max(distances)
         inds = [i for i, x in enumerate(distances) if x == max_dist]
         rows = [batch[ind] for ind in inds]
-        # gc.collect()
         return (max_dist, rows)
 
     processed_list = Parallel(n_jobs=num_cores, backend='loky')(delayed(max_dist_memo)(batch) for batch in batches)
     processed_list = sorted(processed_list, key=lambda tup: tup[0])
-    final_trnas = processed_list[-1][1][0]
+    final_trnas = random.choice(processed_list[-1][1])
     final_trnas = [seq for seq_list in final_trnas for seq in seq_list]
     return final_trnas
 

@@ -93,18 +93,21 @@ base_to_part_2 = RangeDict({(range(1, 8), range(66, 73)): 'tRNA1-7_66-72*', rang
 # And reverse to return the ranges from the part name
 part_to_range_2 = {val: key for key, val in base_to_part_2.items()}
 
-base_comp = {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}
+# base_comp = {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}
+base_comp = {'A': ['T'], 'T': ['G', 'A'], 'C': ['G'], 'G': ['C', 'T']}
 
 part_order = ['tRNA1-7*', 'tRNA8-9*', 'tRNA10-13*', 'tRNA14-21*', 'tRNA22-25*', 'tRNA26*',
               'tRNA27-31*', 'tRNA32-38*', 'tRNA39-43*', 'tRNA44-48*', 'tRNA49-53*', 'tRNA54-60*',
               'tRNA61-65*', 'tRNA66-72*', 'tRNA73-76*']
 
-trna_pattern = re.compile(
-    '^\\({5,8}\\.{1,3}\\({4}\\.{5,}\\){3,4}\\.*\\({4,9}\\.{7}\\){4,9}.*\\.\\({5}\\.{2,}\\){5}\\){5,8}\\.{3,}$')
-ile_pattern = re.compile(
-    '^\\({5,8}\\.{1,3}\\({3,4}\\.{5,}\\){3,4}\\.*\\({4,9}\\.{7}\\){4,9}.*\\.\\({5}\\.{2,}\\){5}\\){5,8}\\.{3,}$')
-trna_pattern_arg08 = re.compile(
-    '^\\({5,8}\\.{1,3}\\({3,4}\\.{2,}\\){3,4}\\.*\\({4,9}\\.{5,7}\\){4,9}.*\\.\\({5}\\.{2,}\\){5}\\){5,8}\\.{3,}$')
+# trna_pattern = re.compile(
+#     '^\\({5,8}\\.{1,3}\\({4}\\.{5,}\\){3,4}\\.*\\({4,9}\\.{7}\\){4,9}.*\\.\\({5}\\.{2,}\\){5}\\){5,8}\\.{3,}$')
+# gly04_pattern = re.compile(
+#     '^\\({5,8}\\.{1,3}\\({4}\\.{5,}\\){3,4}\\.*\\({4,9}\\.{3,7}\\){4,9}.*\\.\\({5}\\.{2,}\\){5}\\){5,8}\\.{3,}$')
+# ile_pattern = re.compile(
+#     '^\\({5,8}\\.{1,3}\\({3,4}\\.{5,}\\){3,4}\\.*\\({4,9}\\.{7}\\){4,9}.*\\.\\({5}\\.{2,}\\){5}\\){5,8}\\.{3,}$')
+# trna_pattern_arg08 = re.compile(
+#     '^\\({5,8}\\.{1,3}\\({3,4}\\.{2,}\\){3,4}\\.*\\({4,9}\\.{5,7}\\){4,9}.*\\.\\({5}\\.{2,}\\){5}\\){5,8}\\.{3,}$')
 
 
 class Synthetase2(object):
@@ -280,18 +283,19 @@ class Isoacceptor2(object):
                 return True
             else:
                 part1, part2 = part.seq.split('_')
-                part1_rev = ''.join([base_comp[c] for c in part1])[::-1]
+                #part1_rev = ''.join([base_comp[c] for c in part1])[::-1]
                 # Ile does not need to be exact for D-arm
                 if self.aa.title() == 'Ile' and part.region == 'tRNA10-13_22-25*':
-                    if sum([i == j for i, j in zip(part1_rev, part2)]) >= 3:
+                    if sum([i in base_comp[j] for i, j in zip(part1, part2[::-1])]) >= 3:
                         return True
                     else:
                         return False
                 else:
-                    if part1_rev == part2:
-                        return True
-                    else:
-                        return False
+                    return all([i in base_comp[j] for i, j in zip(part1, part2[::-1])])
+                    # if part1_rev == part2:
+                    #     return True
+                    # else:
+                    #     return False
 
         # Extra step to remove any base paired parts that are not reverse complements (so max 256 seq)
         if self.comp_arm_strict:
@@ -309,6 +313,7 @@ class Isoacceptor2(object):
 
         self.folded = {}
         self.low_part_types = []
+        self.mid_part_types = []
 
         if self.reference:
             ref_df = pd.read_csv(self.reference, header=None)
@@ -324,7 +329,7 @@ class Isoacceptor2(object):
     #######################
 
     def cluster_parts(self, sample_size, synth_name, clust_id_parts=False, display=False, log_file=None, iteration=1,
-                      automatic=False, clust_size_min=None, subtle=False):
+                      automatic=False, clust_size_min=None, subtle=False, ham=False):
 
         """This method uses Levenshtein distance between sequences and affinity propagation to cluster parts.
         Clustering could be optimised. For maximum sample size, parameters have been adjusted to:
@@ -336,6 +341,13 @@ class Isoacceptor2(object):
         clust_id_parts takes True or False, and decides whether to also cluster parts containing identity elements
         for the chosen isoacceptor class - since these are kept constant for each synthetase.
         display is for me to show people how cool the clustering output is (will print results for all to see)."""
+
+        # Here's what we're gonna do
+        # If N>clust_min, cluster
+        # If N<15 from the start, all exemplar
+        # If N<clust_min and num_seqs_for_part >= 3, then diversity calculation
+        # If num_seqs_for_part < 3 (i.e. N<3*num_iter from start), take random sample of 3 from part_list, randomly
+            # remove 1 or 2 of these 3 as used parts randomly
 
         now = time.time()
         print('Clustering Parts...')
@@ -395,18 +407,30 @@ class Isoacceptor2(object):
         # Make all low numbered part types exemplars
         if iteration == 1:
             for part_type, parts in clust_dict.items():
-                if len(parts) < 15:
+                if ham:
+                    for i, part in enumerate(parts):
+                        part.cluster_id = i
+                        part.exemplar = 'all'
+                        self.low_part_types.append(part_type)
+                elif len(parts) < 15:
                     self.low_part_types.append(part_type)
                     for i, part in enumerate(parts):
                         part.cluster_id = i
                         part.exemplar = 'all'
+                elif len(parts) < self.num_iter*3:
+                    self.mid_part_types.append(part_type)
+
+        print({part_type: len(part_list) for part_type, part_list in clust_dict.items()})
 
         for part_type, part_list in clust_dict.items():
             if len(part_list) < clust_size_min and part_type not in self.low_part_types:  # and part_type != 'tRNA8-9*':
                 print('Diversity Calculation ' + part_type)
                 num_seqs_for_part = math.floor(len(part_list) / iter_remain)
                 sample_parts = part_list[:30]
-                diverse_seqs = max_dist_parallel_memo(sample_parts, min([num_seqs_for_part, 7]))
+                if part_type in self.mid_part_types:
+                    diverse_seqs, _ = max_dist_parallel_memo(random.sample(sample_parts, 15), 7)
+                else:
+                    diverse_seqs, _ = max_dist_parallel_memo(sample_parts, min([num_seqs_for_part, 7]))
                 for part in part_list:
                     if part.seq in diverse_seqs and part.exemplar != 'all':
                         part.exemplar = iteration
@@ -457,7 +481,7 @@ class Isoacceptor2(object):
         #                        if part_type not in self.id_parts}
 
         for part_type, part_list in self.all_parts.items():
-            if part_type not in self.id_parts and part_type not in self.exemplar_parts.keys():
+            if part_type not in self.id_parts: #and part_type not in self.exemplar_parts.keys():
                 self.exemplar_parts[part_type] = [part for part in part_list if part.exemplar in ['all', iteration]]
 
         for part_type, part_list in self.exemplar_parts.items():
@@ -465,6 +489,8 @@ class Isoacceptor2(object):
                 self.used_parts[part_type] += [part for part in part_list if part.exemplar == iteration]
             else:
                 self.used_parts[part_type] = [part for part in part_list if part.exemplar == iteration]
+            if part_type in self.mid_part_types:
+                self.used_parts[part_type] = []
 
         est = np.prod([len(part_list) + 1 if part_type != 'tRNA8-9*' else len(part_list)
                        for part_type, part_list in self.exemplar_parts.items()])
@@ -668,8 +694,8 @@ class Isoacceptor2(object):
 
     ###############################
 
-    def fold_filter(self, ac, fold_file, output_dir, synth_name, iteration=1, freq_thresh=0.3, div_thresh=10,
-                    inplace=True, pattern=trna_pattern, log_file=None):
+    def fold_filter(self, ac, fold_file, output_dir, synth_name, pattern, iteration=1, freq_thresh=0.3, div_thresh=10,
+                    inplace=True, log_file=None):
 
         """Filters RNAfold output.
         ac is important to save information to correct dictionary key.
@@ -731,7 +757,8 @@ class Isoacceptor2(object):
         if log_file:
             with open(log_file, 'a') as f:
                 f.write(f'Chimeras: {len(self.well_folded)} Anticodon: {ac} '
-                        f'Frequency: >={freq_thresh} Diversity: <={div_thresh}\n')
+                        f'Frequency: >={freq_thresh} Diversity: <={div_thresh}\n'
+                        f'Pattern: {pattern}\n')
         print(f'There are {len(self.well_folded)} well-folding tRNA designs!...Time elapsed: {time.time() - now}')
 
         if inplace:
@@ -949,14 +976,17 @@ class Isoacceptor2(object):
         print(f'{len(self.exemplar_trnas)} exemplars chosen...Maximising diversity...Time elapsed: {time.time() - now}')
 
         if num_seqs < len(self.exemplar_trnas):
-            c = [list(x) for x in combinations(range(len(data)), num_seqs)]
-            distances = []
-            for i in c:
-                distances.append(np.min(pdist(data[i, :], lambda u, v: distance.levenshtein(u[0], v[0]))))
-            ind = distances.index(max(distances))
-            rows = c[ind]
-            self.final_trnas = [read_back[i] for i in rows]
-            self.final_trnas = {trna_name: trna for trna_dict in self.final_trnas for trna_name, trna in trna_dict.items()}
+            # c = [list(x) for x in combinations(range(len(data)), num_seqs)]
+            # distances = []
+            # for i in c:
+            #     distances.append(np.min(pdist(data[i, :], lambda u, v: distance.levenshtein(u[0], v[0]))))
+            # ind = distances.index(max(distances))
+            # rows = c[ind]
+            # self.final_trnas = [read_back[i] for i in rows]
+            # self.final_trnas = {trna_name: trna for trna_dict in self.final_trnas for trna_name, trna in trna_dict.items()}
+            diverse_trnas, distances = max_dist_parallel_memo([tRNA for tRNA in self.exemplar_trnas.values()], num_seqs, type='tRNA')
+            self.final_trnas = {trna_name: trna for trna_name, trna in self.exemplar_trnas.items()
+                                if trna.seq['CTA'] in diverse_trnas}
         else:
             distances = []
             self.final_trnas = self.exemplar_trnas
@@ -969,7 +999,7 @@ class Isoacceptor2(object):
             with open(log_file, 'a') as f:
                 f.write(f'{num_seqs} Chimeras Chosen\n')
                 if distances:
-                    f.write(f'Minimum Distance: {max(distances)}\n')
+                    f.write(f'Minimum Distance: {distances}\n')
                 f.write(log_string)
         print(f'Designs Finished!...Time Elapsed: {time.time() - now}')
 
@@ -1202,3 +1232,4 @@ class tRNA(object):
         return f'Seq: {self.seq} Cervettini Score: {self.cer_score}'
 
 #############################################################################################################
+

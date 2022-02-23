@@ -411,7 +411,7 @@ class Isoacceptor2(object):
                     for i, part in enumerate(parts):
                         part.cluster_id = i
                         part.exemplar = 'all'
-                        self.low_part_types.append(part_type)
+                    self.low_part_types.append(part_type)
                 elif len(parts) < 15:
                     self.low_part_types.append(part_type)
                     for i, part in enumerate(parts):

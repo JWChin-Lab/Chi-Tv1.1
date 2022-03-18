@@ -36,8 +36,8 @@ if __name__ == '__main__':
                                                                     'number of chimeras, and step size',
                         type=float, default=[0.5, 0.2, 2500000, 0.05])
     parser.add_argument('-a', '--anticodons', nargs='+', help='Anticodons to iterate through')
-    parser.add_argument('-f', '--frequency', help='Minimum frequency for first anticodon.', default=0.3, type=float)
-    parser.add_argument('-d', '--diversity', help='Maximum diversity for first anticodon.', default=5.0, type=float)
+    parser.add_argument('-f', '--frequency', help='Average frequency across anticodons', default=0.3, type=float)
+    parser.add_argument('-d', '--diversity', help='Average diversity across anticodons', default=5.0, type=float)
     parser.add_argument('-n', '--num_iterations', help='Number of times to iterate through Chi-T per synthetase',
                         default=1, type=int)
     parser.add_argument('-m', '--automatic', help='No user input required', action='store_true')
@@ -58,6 +58,7 @@ if __name__ == '__main__':
     first_ac = args.anticodons[0]
 
     Path(f'{args.output_directory}/folding').mkdir(parents=True, exist_ok=True)
+    Path(f'{args.output_directory}/plots').mkdir(parents=True, exist_ok=True)
 
     log_file = f'{args.output_directory}/log_file.txt'
     with open(log_file, 'w') as f:
@@ -89,6 +90,9 @@ if __name__ == '__main__':
 
     df = df[df['Amino Acid'] == args.amino_acid]
     synth_df = synth_clean(args.synth_file)
+    # synth_df_ = synth_df[synth_df.synth in args.synth_name]
+    # if not all([seq_id in df.seq_id for seq_id in synth_df_.trna_id]):
+    #     raise Exception("One or more tRNA ID in synth file not found in database. Check file.")
     total_iter = len(args.synth_name)*args.num_iterations
     iso = Isoacceptor2(synth_df, id_dict, args.amino_acid, df, ac=first_ac, id_part_change=args.id_part_change,
                        num_iter=total_iter, reference=args.reference)
@@ -136,7 +140,7 @@ if __name__ == '__main__':
         iso.store_trnas(f'{args.output_directory}/{synth_name}_selected.csv')
 
         cluster = len(iso.trnas) > 40
-        iso.cluster_select(cluster=cluster, num_seqs = args.num_tRNAs, log_file=log_file)
+        iso.cluster_select(cluster=cluster, num_seqs=args.num_tRNAs, log_file=log_file)
 
         try:
             driver = webdriver.Chrome()

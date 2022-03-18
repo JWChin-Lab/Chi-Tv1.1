@@ -368,7 +368,11 @@ class Isoacceptor2(object):
             trna = self.huge_df[self.huge_df.seq_id == trna_id]
             for part_type in self.id_part_change:
                 trna_part_seq = list(trna[part_type])[0]
-                trna_part = Part2(trna_part_seq, part_type, self.aa, trna_id, trna_part_seq, self)
+                if part_type == 'tRNA14-21_54-60*':
+                    trna_part_al = list(trna['tRNA14-21_54-60* aligned'])[0]
+                else:
+                    trna_part_al = trna_part_seq
+                trna_part = Part2(trna_part_seq, part_type, self.aa, trna_id, trna_part_al, self)
                 new_list = []
                 for part in clust_dict[part_type]:
                     success_list = []
@@ -411,7 +415,7 @@ class Isoacceptor2(object):
                     for i, part in enumerate(parts):
                         part.cluster_id = i
                         part.exemplar = 'all'
-                        self.low_part_types.append(part_type)
+                    self.low_part_types.append(part_type)
                 elif len(parts) < 15:
                     self.low_part_types.append(part_type)
                     for i, part in enumerate(parts):
@@ -593,7 +597,7 @@ class Isoacceptor2(object):
         plt.hist(cscores, bins=[i for i in np.arange(-1, 1, 0.05)])
         plt.ylabel('Count')
         plt.xlabel('Cervettini Score')
-        plt.savefig(output_dir + f'/cscores_{synth_name}_iter{iteration}.pdf')
+        plt.savefig(output_dir + f'/plots/cscores_{synth_name}_iter{iteration}.pdf')
         plt.clf()
         print(f'Filtering tRNAs...Time Elapsed: {time.time() - now}')
         stringency = start_stringency
@@ -895,7 +899,7 @@ class Isoacceptor2(object):
         else:
             if subtle:
                 start = 1
-                end = 5
+                end = 8
             else:
                 start = 5
                 end = 30

@@ -22,7 +22,9 @@ def d_loop_extend(x):
         return x
 
 
-def d_loop_align(x):
+def d_loop_align(x, d_al_dict):
+    if x in d_al_dict.values():
+        return x
     try:
         g_start = re.search("...GG.", x).span()[0]
         g_start += 3
@@ -49,7 +51,7 @@ def clean_from_trnadb(df, d_al_dict):
 
     df_['tRNA14-21* aligned'] = df_['tRNA14-21*'].map(d_al_dict).fillna(df_['tRNA14-21*'])
     df_['tRNA14-21* aligned'] = df_['tRNA14-21* aligned'].apply(d_loop_extend)
-    df_['tRNA14-21* aligned'] = df_['tRNA14-21* aligned'].apply(d_loop_align)
+    df_['tRNA14-21* aligned'] = df_['tRNA14-21* aligned'].apply(d_loop_align, args=(d_al_dict,))
     df_['tRNA73-76*'] = df_['tRNA73-76*'].apply(lambda x: x[0] + 'CCA')
     df_['tRNA32-38*'] = df_['tRNA32-38*'].apply(lambda x: x[0:2] + 'CTA' + x[-2:])
     for col_name in df_.loc[:, 'tRNA1-7*':'tRNA73-76*'].columns:

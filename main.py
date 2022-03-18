@@ -76,8 +76,10 @@ if __name__ == '__main__':
                      engine='c')
 
     trna_pattern = re.compile(
-        '^\\({5,8}\\.{1,3}\\({4}\\.{5,}\\){3,4}\\.*\\({4,9}\\.{7}\\){4,9}.*\\.\\({5}\\.{2,}\\){5}\\){5,8}\\.{3,}$')
-    pat_dict = {synth_name: trna_pattern for synth_name in args.synth_name}
+        '^\\({5,8}\\.{1,3}\\({4}\\.{5,}\\){4}\\.*\\({4,9}\\.{7}\\){4,9}.*\\.\\({5}\\.{2,}\\){5}\\){5,8}\\.{3,}$')
+    ile_pattern = re.compile(
+        '^\\({5,8}\\.{1,3}\\({3}\\.{5,}\\){3}\\.*\\({4,9}\\.{7}\\){4,9}.*\\.\\({5}\\.{2,}\\){5}\\){5,8}\\.{3,}$')
+    pat_dict = {synth_name: (trna_pattern if args.amino_acid != 'Ile' else ile_pattern) for synth_name in args.synth_name}
     if args.pattern:
         pat_df = pd.read_csv(args.pattern, header=None)
         pat_dict_ = dict(zip(pat_df.iloc[:, 0], pat_df.iloc[:, 1]))

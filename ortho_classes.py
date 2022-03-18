@@ -1139,8 +1139,9 @@ class Part2(object):
             if part_type_1 != 'tRNA14-21*':
                 part_1_align = part_1_seq
             else:
-                part_1_align = d_loop_extend(part_1_seq)
-                part_1_align = d_loop_align(part_1_align)
+                part_1_align = self.aligned.split('_')[0]
+                # part_1_align = d_loop_extend(part_1_seq)
+                # part_1_align = d_loop_align(part_1_align, d_al_dict=)
                 # Some manually input parts don't align, so need to do slower dataframe lookup
                 if part_1_align is np.nan:
                     part_1_align = self.iso.huge_df[self.iso.huge_df['tRNA14-21*'] == part_1_seq].iloc[0]['tRNA14-21* aligned']

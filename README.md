@@ -136,3 +136,40 @@ An example use case is shown below
 ### Example Usage with Arguments
 
 ```python main.py tRNA_database.csv synthetase_file.xlsx metSynth1 metSynth2 Met –o output_folder –ip tRNA1-7_66-72* –cp 70 –cm 30 –cf 0.3 0 1500000 0.1 –-subtle –-reference reference_file.csv –-length_filt 78 –-anticodons CTA TGA CGA –-frequency 0.5 –-diversity 3 –n 3  –m –i –p pattern_file.xlsx –ham –t 6```
+
+## Creating Oligos
+
+oligo_maker.py script included to produce csv file with designs.
+
+```python oligo_maker.py <tRNA design file> <output csv file> --forward_5 NNNNN --forward_3 NNNNN --reverse_5 NNNN --reverse_3 NNNN --anticodon CTA```
+
+* tRNA design file: csv output file of main.py containing final designs
+* output csv file: name of file oligos should be written to.
+* --forward_5: sequence to add to 5' end of forward (sense) primer. Default GGCCGC
+* --forward_3: sequence to add to 3' end of forward primer. Default CTGCA
+* --reverse_5: sequence to add to 5' end of reverse primer. Default GATCTGCAG
+* --reverse_3: sequence to add to 3' end of reverse primer. Default GC
+* --anticodon: Designs to be written to output file will have this anticodon. Default CTA
+
+## Checking a tRNA is in the database
+
+tRNA_check.py script included to check if a tRNA ID is in the clean csv file of all tRNAs. Can be useful since many of the tRNA IDs specified in suppl. tables of Cervettini (2020) are not found in updated versions of tRNADB-CE.
+
+```python tRNA_check.py <tRNA DB file> <tRNA_id>```
+
+* tRNA DB file: Clean tRNADB-CE csv file (processed through cleanup.py)
+* tRNA_id: tRNADB-CE ID (or any) to check
+
+If present, script will return the entry. Otherwise will return 'False'
+
+## Adding a tRNA to the database file
+
+tRNA_adder.py script used to add tRNAs to your cleaned tRNADB-CE csv file. Useful as tRNADB-CE does not currently contain eukaryotic tRNAs.
+
+```python tRNA_adder.py <tRNA_file> <alignment_file> --new_name updated_tRNAs.csv```
+
+* tRNA_file: Clean tRNADB-CE csv file
+* alignment_file: xlsx file containing D-loop alignments. Provided as d_align.xlsx
+* -n, --new_name: Optional name of new csv file.
+
+Script will ask for user input to build new entry manually.

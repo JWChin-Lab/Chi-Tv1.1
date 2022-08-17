@@ -90,6 +90,7 @@ if __name__ == '__main__':
 
     df = df[df['Amino Acid'] == args.amino_acid]
     synth_df = synth_clean(args.synth_file)
+    synth_df = synth_df[synth_df.synth.isin(args.synth_name)]
     # synth_df_ = synth_df[synth_df.synth in args.synth_name]
     # if not all([seq_id in df.seq_id for seq_id in synth_df_.trna_id]):
     #     raise Exception("One or more tRNA ID in synth file not found in database. Check file.")

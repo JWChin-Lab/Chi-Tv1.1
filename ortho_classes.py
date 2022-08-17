@@ -141,7 +141,10 @@ class Synthetase2(object):
                         align = seq
                     else:
                         align = self.huge_df[self.huge_df.seq_id == self.trna_id].iloc[0]['tRNA14-21_54-60* aligned']
-                    self.id_seqs[part] = Part2(seq, part, self.aa, self.trna_id, align, self.iso)
+                    if isinstance(seq, str):
+                        self.id_seqs[part] = Part2(seq, part, self.aa, self.trna_id, align, self.iso)
+                    else:
+                        raise Exception('ID sequences in databases are not present - check database')
 
                 except IndexError:
                     pass
@@ -152,7 +155,8 @@ class Synthetase2(object):
                         align = seq
                     else:
                         align = self.huge_df[self.huge_df.seq_id == self.trna_id].iloc[0]['tRNA14-21_54-60* aligned']
-                    self.non_id_seqs[part] = Part2(seq, part, self.aa, self.trna_id, align, self.iso)
+                    if isinstance(seq, str):
+                        self.non_id_seqs[part] = Part2(seq, part, self.aa, self.trna_id, align, self.iso)
 
                 except IndexError:
                     pass
@@ -368,20 +372,21 @@ class Isoacceptor2(object):
             trna = self.huge_df[self.huge_df.seq_id == trna_id]
             for part_type in self.id_part_change:
                 trna_part_seq = list(trna[part_type])[0]
-                if part_type == 'tRNA14-21_54-60*':
-                    trna_part_al = list(trna['tRNA14-21_54-60* aligned'])[0]
-                else:
-                    trna_part_al = trna_part_seq
-                trna_part = Part2(trna_part_seq, part_type, self.aa, trna_id, trna_part_al, self)
-                new_list = []
-                for part in clust_dict[part_type]:
-                    success_list = []
-                    for base in self.non_part_ids[part_type]:
-                        trna_base = trna_part.seq_dict[base]
-                        success_list.append(part.seq_dict[base] == trna_base)
-                    if all(success_list):
-                        new_list.append(part)
-                clust_dict[part_type] = new_list
+                if isinstance(trna_part_seq, str):
+                    if part_type == 'tRNA14-21_54-60*':
+                        trna_part_al = list(trna['tRNA14-21_54-60* aligned'])[0]
+                    else:
+                        trna_part_al = trna_part_seq
+                    trna_part = Part2(trna_part_seq, part_type, self.aa, trna_id, trna_part_al, self)
+                    new_list = []
+                    for part in clust_dict[part_type]:
+                        success_list = []
+                        for base in self.non_part_ids[part_type]:
+                            trna_base = trna_part.seq_dict[base]
+                            success_list.append(part.seq_dict[base] == trna_base)
+                        if all(success_list):
+                            new_list.append(part)
+                    clust_dict[part_type] = new_list
 
         # Remove Used parts from clust_dict
         if self.used_parts:
@@ -530,7 +535,7 @@ class Isoacceptor2(object):
 
         now = time.time()
         print(f'Choosing exemplars...Time Elapsed: {time.time() - now}')
-
+        # print([synth.name for synth in self.synths])
         for part_type, id_seq in [synth for synth in self.synths if synth.name == synth_name][0].id_seqs.items():
             self.exemplar_parts[part_type] = [id_seq]
 

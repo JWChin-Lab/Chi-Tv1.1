@@ -109,6 +109,10 @@ part_order = ['tRNA1-7*', 'tRNA8-9*', 'tRNA10-13*', 'tRNA14-21*', 'tRNA22-25*', 
 # trna_pattern_arg08 = re.compile(
 #     '^\\({5,8}\\.{1,3}\\({3,4}\\.{2,}\\){3,4}\\.*\\({4,9}\\.{5,7}\\){4,9}.*\\.\\({5}\\.{2,}\\){5}\\){5,8}\\.{3,}$')
 
+allowed = set('A' + 'C' + 'T' + 'G' + '_')
+
+def check(test_str):
+    return set(test_str) <= allowed
 
 class Synthetase2(object):
     """Synthetase2 class contains information about the synthetases defined by the user.
@@ -155,7 +159,8 @@ class Synthetase2(object):
                         align = seq
                     else:
                         align = self.huge_df[self.huge_df.seq_id == self.trna_id].iloc[0]['tRNA14-21_54-60* aligned']
-                    if isinstance(seq, str):
+                    if isinstance(align, str) and check(align):
+
                         self.non_id_seqs[part] = Part2(seq, part, self.aa, self.trna_id, align, self.iso)
 
                 except IndexError:
@@ -1086,7 +1091,7 @@ class Part2(object):
             try:
                 self.seq_dict = {i: base for i, base in zip(self.base_range, self.aligned)}
             except:
-                print(f'seq: {self.seq} align: {self.aligned} region: {self.region} base_range: {self.base_range}')
+                print(f'seq: {self.seq} align: {self.aligned} region: {self.region} base_range: {self.base_range} id: {self.trna_id}')
                 raise Exception
 
         # id_dict is not associated with the class, but defined outside

@@ -326,14 +326,17 @@ class Isoacceptor2(object):
 
         if self.reference:
             ref_df = pd.read_csv(self.reference, header=None)
+            asl = ref_df.iloc[0, 7]
+            asl = asl[:2] + self.ac + asl[-2:]
             self.reference_trna = {'tRNA1-7_66-72*': ref_df.iloc[0, 0] + '_' + ref_df.iloc[0, 13],
                                    'tRNA8-9*': ref_df.iloc[0, 1],
                                    'tRNA10-13_22-25*': ref_df.iloc[0, 2] + '_' + ref_df.iloc[0, 4],
                                    'tRNA14-21_54-60*': ref_df.iloc[0, 3] + '_' + ref_df.iloc[0, 11],
                                    'tRNA26_44-48*': ref_df.iloc[0, 5] + '_' + ref_df.iloc[0, 9],
                                    'tRNA27-31_39-43*': ref_df.iloc[0, 6] + '_' + ref_df.iloc[0, 8],
-                                   'tRNA32-38*': ref_df.iloc[0, 7],
+                                   'tRNA32-38*': asl,
                                    'tRNA49-53_61-65*': ref_df.iloc[0, 10] + '_' + ref_df.iloc[0, 12]}
+            self.ref_seq = ''.join(ref_df.iloc[0, :])
 
     #######################
 
@@ -444,7 +447,7 @@ class Isoacceptor2(object):
                 if part_type in self.mid_part_types:
                     diverse_seqs, _ = max_dist_parallel_memo(random.sample(sample_parts, 15), 7)
                 else:
-                    diverse_seqs, _ = max_dist_parallel_memo(sample_parts, min([num_seqs_for_part, 7]))
+                    diverse_seqs, _ = max_dist_parallel_memo(sample_parts, min([num_seqs_for_part, 7]), self.ac)
                 for part in part_list:
                     if part.seq in diverse_seqs and part.exemplar != 'all':
                         part.exemplar = iteration
@@ -843,7 +846,7 @@ class Isoacceptor2(object):
 
     ########################################
 
-    def select(self, synth_name, output_dir, automatic=False, log_file=None, subtle=False):
+    def select(self, synth_name, output_dir, automatic=False, log_file=None, subtle=False, native=None):
 
         """Selection step.
         Method calculates levenshtein distance between the tRNA and the native tRNA for this synthetase.
@@ -857,12 +860,16 @@ class Isoacceptor2(object):
         self.trnas = self.iter_trnas
         synth_ = [synth for synth in self.synths if synth.name == synth_name][0]
         native = pd.Series()
-        native['seq'] = self.huge_df[self.huge_df.seq_id == synth_.trna_id].loc[:, 'tRNA1-7*':'tRNA73-76*'].apply(
-            lambda x: ''.join(x), axis=1)
-        for seq in native.seq:
-            native_seq = seq
-        for name, trna in self.trnas.items():
-            trna.nat_lev_dist = distance.levenshtein(trna.seq[self.ac], native_seq)
+        if not self.reference:
+            native['seq'] = self.huge_df[self.huge_df.seq_id == synth_.trna_id].loc[:, 'tRNA1-7*':'tRNA73-76*'].apply(
+                lambda x: ''.join(x), axis=1)
+            for seq in native.seq:
+                native_seq = seq
+            for name, trna in self.trnas.items():
+                trna.nat_lev_dist = distance.levenshtein(trna.seq[self.ac], native_seq)
+        else:
+            for name, trna in self.trnas.items():
+                trna.nat_lev_dist = distance.levenshtein(trna.seq[self.ac], self.ref_seq)
 
         dict_for_plot = {name: [trna.ec_lev_dist, trna.nat_lev_dist, trna.seq[self.ac]] for name, trna in
                          self.trnas.items()}
@@ -998,9 +1005,9 @@ class Isoacceptor2(object):
             # rows = c[ind]
             # self.final_trnas = [read_back[i] for i in rows]
             # self.final_trnas = {trna_name: trna for trna_dict in self.final_trnas for trna_name, trna in trna_dict.items()}
-            diverse_trnas, distances = max_dist_parallel_memo([tRNA for tRNA in self.exemplar_trnas.values()], num_seqs, type='tRNA')
+            diverse_trnas, distances = max_dist_parallel_memo([tRNA for tRNA in self.exemplar_trnas.values()], num_seqs, self.ac, type='tRNA')
             self.final_trnas = {trna_name: trna for trna_name, trna in self.exemplar_trnas.items()
-                                if trna.seq['CTA'] in diverse_trnas}
+                                if trna.seq[self.ac] in diverse_trnas}
         else:
             distances = []
             self.final_trnas = self.exemplar_trnas
@@ -1008,8 +1015,8 @@ class Isoacceptor2(object):
         if log_file:
             log_string = ''
             for trna_name, trna in self.final_trnas.items():
-                log_string += f">{trna_name}\n{trna.seq['CTA']}\n{trna.struct['CTA']}\n" \
-                              f"Frequency: {trna.freq['CTA']} Diversity: {trna.div['CTA']}\n"
+                log_string += f">{trna_name}\n{trna.seq[self.ac]}\n{trna.struct[self.ac]}\n" \
+                              f"Frequency: {trna.freq[self.ac]} Diversity: {trna.div[self.ac]}\n"
             with open(log_file, 'a') as f:
                 f.write(f'{num_seqs} Chimeras Chosen\n')
                 if distances:

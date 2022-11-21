@@ -55,12 +55,12 @@ def memo_dist(u, v, memo):
         return dist_
 
 
-def max_dist_parallel_memo(part_list, num_seqs, type='part'):
+def max_dist_parallel_memo(part_list, num_seqs, ac, type='part'):
     num_cores = multiprocessing.cpu_count() - 1
     if type == 'part':
         seqs = [[part.seq] for part in part_list]
     elif type == 'tRNA':
-        seqs = [[tRNA.seq['CTA']] for tRNA in part_list]
+        seqs = [[tRNA.seq[ac]] for tRNA in part_list]
     c = [list(x) for x in combinations(seqs, num_seqs)]
     batches = chunks_list(c, math.ceil(len(c) / num_cores))
 

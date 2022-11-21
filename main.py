@@ -89,6 +89,7 @@ if __name__ == '__main__':
         pat_dict.update(pat_dict_)
 
     df = df[df['Amino Acid'] == args.amino_acid]
+    df['tRNA32-38*'] = df['tRNA32-38*'].apply(lambda x: x[:2] + first_ac + x[-2:] if isinstance(x, str) else x)
     synth_df = synth_clean(args.synth_file)
     synth_df = synth_df[synth_df.synth.isin(args.synth_name)]
     # synth_df_ = synth_df[synth_df.synth in args.synth_name]

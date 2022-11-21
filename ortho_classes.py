@@ -614,6 +614,7 @@ class Isoacceptor2(object):
         plt.clf()
         print(f'Filtering tRNAs...Time Elapsed: {time.time() - now}')
         stringency = start_stringency
+        step_size = round(step_size, 4)
         log_string = 'Cervettini Filtering: \n'
         for i in range(round((start_stringency - min_stringency) / step_size) + 1):
             if len(self.trnas) <= target:

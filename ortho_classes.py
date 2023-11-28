@@ -283,8 +283,8 @@ class Isoacceptor2(object):
                           for part_type, part_list in self.all_parts.items()}
 
         # Removes ASLs that close up
-        self.all_parts['tRNA32-38*'] = [part for part in self.all_parts['tRNA32-38*']
-                                        if (part.seq[0] + part.seq[-1] not in ['CG', 'GC'])]
+        # self.all_parts['tRNA32-38*'] = [part for part in self.all_parts['tRNA32-38*']
+        #                                 if (part.seq[0] + part.seq[-1] not in ['CG', 'GC'])]
 
         def comp_checker(part):
             """If comp_arm_strict True, then check that each paired region is complementary"""

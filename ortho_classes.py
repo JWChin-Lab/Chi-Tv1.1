@@ -93,8 +93,8 @@ base_to_part_2 = RangeDict({(range(1, 8), range(66, 73)): 'tRNA1-7_66-72*', rang
 # And reverse to return the ranges from the part name
 part_to_range_2 = {val: key for key, val in base_to_part_2.items()}
 
-# base_comp = {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}
-base_comp = {'A': ['T'], 'T': ['G', 'A'], 'C': ['G'], 'G': ['C', 'T']}
+base_comp = {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}
+# base_comp = {'A': ['T'], 'T': ['G', 'A'], 'C': ['G'], 'G': ['C', 'T']}
 
 part_order = ['tRNA1-7*', 'tRNA8-9*', 'tRNA10-13*', 'tRNA14-21*', 'tRNA22-25*', 'tRNA26*',
               'tRNA27-31*', 'tRNA32-38*', 'tRNA39-43*', 'tRNA44-48*', 'tRNA49-53*', 'tRNA54-60*',

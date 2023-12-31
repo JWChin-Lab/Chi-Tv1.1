@@ -294,7 +294,7 @@ class Isoacceptor2(object):
                 part1, part2 = part.seq.split('_')
                 #part1_rev = ''.join([base_comp[c] for c in part1])[::-1]
                 # Ile does not need to be exact for D-arm
-                if self.aa.title() == 'Ile' and part.region == 'tRNA10-13_22-25*':
+                if self.aa.title() in ['Ile', 'Leu'] and part.region == 'tRNA10-13_22-25*':
                     if sum([i in base_comp[j] for i, j in zip(part1, part2[::-1])]) >= 3:
                         return True
                     else:
@@ -315,6 +315,9 @@ class Isoacceptor2(object):
                                            if len(part.seq) <= (v_loop_length + 2)]
 
         self.all_parts['tRNA8-9*'] = [part for part in self.all_parts['tRNA8-9*'] if 'T' in part.seq]
+
+        self.all_parts['tRNA14-21_54-60*'] = [part for part in self.all_parts['tRNA14-21_54-60*'] if
+                                              part.seq[0] == 'A']
 
         # Sort list of parts by scores, so clustering can take top scorers
         for part_list in self.all_parts.values():
@@ -623,7 +626,7 @@ class Isoacceptor2(object):
             self.trnas = {name: trna for name, trna in self.trnas.items() if max(trna.cer_score.values()) <= stringency}
             log_string += f'Threshold: {stringency} tRNAs remaining: {len(self.trnas)}\n'
             print(f'Threshold: {stringency} tRNAs remaining: {len(self.trnas)}...Time Elapsed: {time.time() - now}')
-            stringency -= step_size
+            stringency = round(stringency - step_size, 4)
 
         if log_file:
             with open(log_file, 'a') as f:
@@ -712,7 +715,7 @@ class Isoacceptor2(object):
 
     ###############################
 
-    def fold_filter(self, ac, fold_file, output_dir, synth_name, pattern, iteration=1, freq_thresh=0.3, div_thresh=10,
+    def fold_filter(self, ac, fold_file, output_dir, synth_name, pattern, iteration=1, freq_thresh=0.2, div_thresh=10,
                     inplace=True, log_file=None):
 
         """Filters RNAfold output.
@@ -760,16 +763,16 @@ class Isoacceptor2(object):
                      and trna.freq[ac] >= freq_thresh
                      and trna.div[ac] <= div_thresh}
 
-        filtered = {}
-        for name, trna in filt_data.items():
-            first_unpaired = trna.struct[ac].find('.')
-
-            indices = re.compile('\(\\.').finditer(trna.struct[ac])
-            next(indices)
-            d_loop_start = next(indices).span()[0] + 1
-
-            if 'T' in trna.seq[ac][first_unpaired:first_unpaired + 2] and trna.seq[ac][d_loop_start] == 'A':
-                filtered.update({name: trna})
+        filtered = filt_data
+        # for name, trna in filt_data.items():
+        #     first_unpaired = trna.struct[ac].find('.')
+        #
+        #     indices = re.compile('\(\\.').finditer(trna.struct[ac])
+        #     next(indices)
+        #     d_loop_start = next(indices).span()[0] + 1
+        #
+        #     if 'T' in trna.seq[ac][first_unpaired:first_unpaired + 2] and trna.seq[ac][d_loop_start] == 'A':
+        #         filtered.update({name: trna})
 
         self.well_folded = {seq_name: trna for seq_name, trna in filtered.items()}
         if log_file:

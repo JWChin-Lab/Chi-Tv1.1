@@ -36,8 +36,14 @@ if __name__ == '__main__':
                                                                     'number of chimeras, and step size',
                         type=float, default=[0.5, 0.2, 2500000, 0.05])
     parser.add_argument('-a', '--anticodons', nargs='+', help='Anticodons to iterate through')
-    parser.add_argument('-f', '--frequency', help='Average frequency across anticodons', default=0.3, type=float)
-    parser.add_argument('-d', '--diversity', help='Average diversity across anticodons', default=5.0, type=float)
+    parser.add_argument('-f', '--frequency', help='Minimum frequency for any tRNA', default=0.2, type=float,
+                        nargs='+')
+    parser.add_argument('-d', '--diversity', help='Maximum diversity for any tRNA', default=10.0, type=float,
+                        nargs='+')
+    parser.add_argument('-ff', '--final_frequency', help='Average frequency across anticodons', default=0.3, type=float,
+                        nargs='+')
+    parser.add_argument('-fd', '--final_diversity', help='Average diversity across anticodons', default=7.0, type=float,
+                        nargs='+')
     parser.add_argument('-n', '--num_iterations', help='Number of times to iterate through Chi-T per synthetase',
                         default=1, type=int)
     parser.add_argument('-m', '--automatic', help='No user input required', action='store_true')
@@ -54,6 +60,9 @@ if __name__ == '__main__':
         args.cervettini_filt = [(i if i is not None else j)
                                 for i, j in zip_longest(args.cervettini_filt, [0.5, 0, 2500000, 0.05])]
     cf_start, cf_min, cf_targ, cf_ss = args.cervettini_filt
+
+    if len({len(args.synth_name), len(args.frequency), len(args.diversity), len(args.final_diversity), len(args.final_frequency)}) != 1:
+        raise Exception('Filtering parameter list and synth name list have different lengths!')
 
     first_ac = args.anticodons[0]
 
@@ -99,7 +108,8 @@ if __name__ == '__main__':
     iso = Isoacceptor2(synth_df, id_dict, args.amino_acid, df, ac=first_ac, id_part_change=args.id_part_change,
                        num_iter=total_iter, reference=args.reference)
 
-    for j, synth_name in enumerate(args.synth_name):
+    for j, synth_name, fr, di, ff, fd in zip(range(len(args.synth_name)), args.synth_name, args.frequency,
+                                           args.diversity, args.final_frequency, args.final_diversity):
         pattern = re.compile(pat_dict[synth_name])
         iso.iter_trnas = {}
         with open(log_file, 'a') as f:
@@ -122,7 +132,8 @@ if __name__ == '__main__':
             rnafold_in_parallel(iso, f'{args.output_directory}/folding/{synth_name}_para_iter{i+1}', first_ac)
             iso.fold_filter(first_ac,
                             f'{args.output_directory}/folding/{synth_name}_para_iter{i+1}_{first_ac}_complete_fold.out',
-                            args.output_directory, synth_name, pattern, iteration=i+1, log_file=log_file)
+                            args.output_directory, synth_name, pattern,
+                            freq_thresh=fr, div_thresh=di, iteration=i+1, log_file=log_file)
 
             for ac in args.anticodons[1:]:
                 if not iso.trnas:
@@ -131,10 +142,11 @@ if __name__ == '__main__':
                 rnafold_in_parallel(iso, f'{args.output_directory}/folding/{synth_name}_para_iter{i+1}', ac)
 
                 iso.fold_filter(ac, f'{args.output_directory}/folding/{synth_name}_para_iter{i+1}_{ac}_complete_fold.out',
-                                args.output_directory, synth_name, pattern, iteration=i+1, log_file=log_file)
+                                args.output_directory, synth_name, pattern,
+                                freq_thresh=fr, div_thresh=di, iteration=i+1, log_file=log_file)
 
             if iso.trnas:
-                iso.final_filter(freq_thresh=args.frequency, div_thresh=args.diversity, percentile_out=0,
+                iso.final_filter(freq_thresh=ff, div_thresh=fd, percentile_out=0,
                                  log_file=log_file)
                 iso.store_trnas(f'{args.output_directory}/{synth_name}_finalfold_iter{i+1}.csv')
 

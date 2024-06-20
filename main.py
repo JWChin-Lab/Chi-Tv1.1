@@ -3,15 +3,58 @@ from ortho_classes import Isoacceptor2, id_dict, synth_clean
 from parallel import rnafold_in_parallel
 import pandas as pd
 from itertools import zip_longest
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.common.exceptions import NoSuchElementException
 from pathlib import Path
 import time
 import re
+import sys
 
 
 if __name__ == '__main__':
+
+    print(" ::::::::  :::    ::: :::::::::::               :::::::::::\n"
+          ":+:    :+: :+:    :+:     :+:                       :+:\n"
+          "+:+        +:+    +:+     +:+                       +:+\n"
+          "+#+        +#++:++#++     +#+     +#++:++#++:++     +#+\n"
+          "+#+        +#+    +#+     +#+                       +#+\n"
+          "#+#    #+# #+#    #+#     #+#                       #+#\n"
+          " ########  ###    ### ###########                   ###     ")
+
+    print("""
+                                               *  ((((
+                                              (((* ** (((.
+                                                      .(,
+                                                      %%%#
+                                              (%%&/%%%
+                                              *%#  .(
+                                              %%%.%%%#
+                                             %%%% %%,
+                                              #( *%%(
+                                            /%%&#%%%
+                                            /%#  .*
+                                            %%%.%%%(
+                                           %%%#.%%*
+         ...  ...                           (* *%%(
+      ......  .. ....                (%%%/#%%&#%%%                   ... ....
+      ...         .,             (%%%           ,*##/ ##/ ##* ,#*  /.,..    ....
+    ....           ((((((((((((,((*              ,%%*.#%#.#&# #&# #%#/         *
+     ..            (%* ,&   #* .#(,              ########,#%# #&# #&#         ....
+     ...          ,((/*(((/(((/(((,              ###, ,*  *(. *#/ /##        ...
+       .... ...,...              ##             ###*                ..../... ...
+            ...                 (##(**       *####*
+                                   ###%&#######(
+                                  (##( ,#
+                                   ## ####
+                                 ###%(##(
+                                 ##   ##
+                                (##(%%##
+                               #### ##
+                           **** ** (##(
+                          **,         ****
+                          ***          /
+                           ***       ,***
+                            , ****,***                                            
+                               .,                                            """)
+    print('Welcome to Chi-T!')
 
     parser = argparse.ArgumentParser()
     parser.add_argument("file", help='Clean tRNADB-CE file')
@@ -40,9 +83,9 @@ if __name__ == '__main__':
                         nargs='+')
     parser.add_argument('-d', '--diversity', help='Maximum diversity for any tRNA', default=10.0, type=float,
                         nargs='+')
-    parser.add_argument('-ff', '--final_frequency', help='Average frequency across anticodons', default=0.3, type=float,
+    parser.add_argument('-F', '--final_frequency', help='Average frequency across anticodons', default=0.35, type=float,
                         nargs='+')
-    parser.add_argument('-fd', '--final_diversity', help='Average diversity across anticodons', default=7.0, type=float,
+    parser.add_argument('-D', '--final_diversity', help='Average diversity across anticodons', default=9.0, type=float,
                         nargs='+')
     parser.add_argument('-n', '--num_iterations', help='Number of times to iterate through Chi-T per synthetase',
                         default=1, type=int)
@@ -50,7 +93,7 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--initial', help='If true, save initial chimeras to csv (only if needed for analysis)',
                         action='store_true')
     parser.add_argument('-p', '--pattern', help='Specify a csv file with synth name and regex string column')
-    parser.add_argument('-ham', '--ham', help='Go ham', action='store_true')
+    # parser.add_argument('-ham', '--ham', help='Go ham', action='store_true')
     parser.add_argument('-t', '--num_tRNAs', help='Number of designs to output', default=4, type=int)
     args = parser.parse_args()
 
@@ -89,7 +132,7 @@ if __name__ == '__main__':
         '^\\({5,8}\\.{1,3}\\({4}\\.{5,}\\){4}\\.*\\({4,9}\\.{7}\\){4,9}.*\\.\\({5}\\.{2,}\\){5}\\){5,8}\\.{3,}$')
     ile_pattern = re.compile(
         '^\\({5,8}\\.{1,3}\\({3}\\.{5,}\\){3}\\.*\\({4,9}\\.{7}\\){4,9}.*\\.\\({5}\\.{2,}\\){5}\\){5,8}\\.{3,}$')
-    pat_dict = {synth_name: (trna_pattern if args.amino_acid != 'Ile' else ile_pattern) for synth_name in args.synth_name}
+    pat_dict = {synth_name: (ile_pattern if args.amino_acid in ['Ile', 'Leu'] else trna_pattern) for synth_name in args.synth_name}
     if args.pattern:
         pat_df = pd.read_csv(args.pattern, header=None)
         pat_dict_ = dict(zip(pat_df.iloc[:, 0], pat_df.iloc[:, 1]))
@@ -121,12 +164,12 @@ if __name__ == '__main__':
 
             iso.cluster_parts(args.cluster_parts, synth_name=synth_name, clust_id_parts=False, log_file=log_file,
                               iteration=i+1, automatic=args.automatic, clust_size_min=args.cluster_min,
-                              subtle=args.subtle, ham=args.ham)
+                              subtle=args.subtle) #, ham=args.ham)
             iso.chimera(synth_name, length_filt=args.length_filt, log_file=log_file, iteration=i+1)
             iso.cervettini_filter(args.output_directory, synth_name, iteration=i+1, start_stringency=cf_start,
                                   min_stringency=cf_min, target=cf_targ, step_size=cf_ss, log_file=log_file)
             if args.initial:
-                iso.store_trnas(f'{args.output_directory}/{synth_name}_initial_iter{i+1}.csv')
+                iso.store_trnas(f'{args.output_directory}/{synth_name}_initial_iter{i+1}.csv', compress=True)
 
             print('Folding...')
             rnafold_in_parallel(iso, f'{args.output_directory}/folding/{synth_name}_para_iter{i+1}', first_ac)
@@ -156,42 +199,6 @@ if __name__ == '__main__':
         cluster = len(iso.trnas) > 40
         iso.cluster_select(cluster=cluster, num_seqs=args.num_tRNAs, log_file=log_file)
 
-        try:
-            driver = webdriver.Chrome()
-            driver.maximize_window()
-            url = 'http://rna.tbi.univie.ac.at/cgi-bin/RNAWebSuite/RNAfold.cgi'
-            final_seqs = [trna.seq[first_ac] for trna in iso.final_trnas.values()]
-
-            for i in range(3):
-                driver.execute_script("window.open('');")
-
-            for seq, handle in zip(final_seqs, driver.window_handles):
-                driver.switch_to.window(handle)
-                driver.get(url)
-                text_box = driver.find_element(By.ID, 'SCREEN')
-                text_box.send_keys(seq)
-                submit = driver.find_element(By.CLASS_NAME, 'proceed')
-                submit.click()
-
-            handles = driver.window_handles
-            handles_to_remove = []
-            while True:
-                success = True
-                handles = [handle for handle in handles if handle not in handles_to_remove]
-                if len(handles) == 0:
-                    break
-                for handle in handles:
-                    time.sleep(0.25)
-                    try:
-                        driver.switch_to.window(handle)
-                        driver.find_element(By.XPATH, '//*[@id="contentmain"]/h3[1]')
-                        driver.execute_script("window.scrollTo(0, 300)")
-                        handles_to_remove.append(handle)
-                    except NoSuchElementException:
-                        pass
-        except:
-            pass
-
         if not args.automatic:
             while True:
                 accept = input('Use these tRNAs? (y)es or (n)o\n> ')
@@ -201,13 +208,13 @@ if __name__ == '__main__':
                     iso.iter_trnas = {}
                     break
                 elif accept.lower() == 'n':
-                    print("Well I dunno man what do you want from me I'm just a machine make your own tRNAs")
-                    iso.iter_trnas = {}
-                    break
+                    print("For help, please refer to our manuscript, or the GitHub page https://github.com/zyzzyva23/Chi-T")
+                    print("Thank you for trying Chi-T!")
+                    sys.exit()
                 else:
-                    print('Innapropriate value!')
+                    print('Inappropriate value!')
                     continue
         else:
             iso.trnas = iso.final_trnas
-            iso.store_trnas(f'{args.output_directory}/{synth_name}_final_four.csv')
+            iso.store_trnas(f'{args.output_directory}/{synth_name}_final_designs.csv')
             iso.iter_trnas = {}

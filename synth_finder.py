@@ -5,9 +5,9 @@ import numpy as np
 from scipy import sparse
 from umap import UMAP
 from plotnine import (ggplot, aes, geom_point,
-                      theme_void, scale_size_manual, scale_shape_manual, scale_alpha_manual, ggsave)
+                      theme_void, scale_size_manual, scale_alpha_manual, ggsave)
 import hdbscan
-from ortho_classes import synth_clean, Part2, tRNA
+from ortho_classes import synth_clean, Part2
 from collections import namedtuple
 from itertools import chain
 
@@ -168,7 +168,10 @@ id_dict = id_dict[args.amino_acid].keys()
 id_parts = {base_to_part_2[base] for base in id_dict}
 id_parts.update(['tRNA73-76*'])
 id_parts = list(id_parts)
-id_seq_df = df.loc[:, ['seq_id', 'gen_id', 'Phylum/Class', 'Species']+list(id_parts)]
+id_parts_a = id_parts.copy()
+if 'tRNA14-21_54-60*' in id_parts:
+    id_parts_a.append('tRNA14-21_54-60* aligned')
+id_seq_df = df.loc[:, ['seq_id', 'gen_id', 'Phylum/Class', 'Species']+list(id_parts_a)]
 
 if args.synth_name:
     chosen_df = id_seq_df[id_seq_df.seq_id.isin(trna_ids)]
@@ -190,6 +193,7 @@ for part_type in id_parts:
         # Might be quicker to do this with a zip command?
         # Although that would require subsetting dataframe for unique sequences first, then iterating,
         # so maybe not - point for pipeline optimisation in future perhaps
+        print(id_sequ_df)
         seqs_dict[part_type] = [part_tuple(row['tRNA14-21_54-60*'], row['tRNA14-21_54-60* aligned'])
                                 for index, row in
                                 id_sequ_df.drop_duplicates(subset=['tRNA14-21_54-60*']).iterrows()

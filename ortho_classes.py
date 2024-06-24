@@ -1177,8 +1177,9 @@ class Part2(object):
         self.cluster_id = None
         self.exemplar = False
 
-        for aa_ in id_dict.keys():
-            self.cer_score[aa_] = self.cer_scorer(aa_)
+        if self.iso:
+            for aa_ in id_dict.keys():
+                self.cer_score[aa_] = self.cer_scorer(aa_)
 
     def cer_scorer(self, aa_):
         id_ = 0

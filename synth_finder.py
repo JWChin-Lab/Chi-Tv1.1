@@ -105,7 +105,7 @@ def UMAPPER_clust(file, neighbours=15, min_dist=0.1, spread=1.0, min_samples=60,
     index['cluster'] = labels
     index['cluster'] = index['cluster'].astype('category')
     index['nearby'] = [True if i in nearby else False for i in range(len(index))]
-    print(f'{len(e)} entries')
+    #print(f'{len(e)} entries')
     return index
 
 
@@ -172,6 +172,7 @@ id_parts_a = id_parts.copy()
 if 'tRNA14-21_54-60*' in id_parts:
     id_parts_a.append('tRNA14-21_54-60* aligned')
 id_seq_df = df.loc[:, ['seq_id', 'gen_id', 'Phylum/Class', 'Species']+list(id_parts_a)]
+print(f'{len(id_seq_df)} {args.amino_acid} tRNAs')
 
 if args.synth_name:
     chosen_df = id_seq_df[id_seq_df.seq_id.isin(trna_ids)]
@@ -181,6 +182,7 @@ id_seq_df['whole'] = id_seq_df.apply(lambda x: '_'.join([x[part] for part in id_
 id_sequ_df = id_seq_df.drop_duplicates('whole')
 id_sequ_df['check'] = id_sequ_df.whole.apply(lambda x: check(x))
 id_sequ_df = id_sequ_df.drop(id_sequ_df[~id_sequ_df.check].index)
+print(f'{len(id_sequ_df)} unique combined identity part sequences')
 
 seqs_dict = {}
 part_tuple = namedtuple('Part_tuple', ['seq', 'align'])
@@ -193,7 +195,6 @@ for part_type in id_parts:
         # Might be quicker to do this with a zip command?
         # Although that would require subsetting dataframe for unique sequences first, then iterating,
         # so maybe not - point for pipeline optimisation in future perhaps
-        print(id_sequ_df)
         seqs_dict[part_type] = [part_tuple(row['tRNA14-21_54-60*'], row['tRNA14-21_54-60* aligned'])
                                 for index, row in
                                 id_sequ_df.drop_duplicates(subset=['tRNA14-21_54-60*']).iterrows()
@@ -235,6 +236,8 @@ id_sequ_df = id_sequ_df.drop(columns=['index'])
 id_sequ_df = id_sequ_df.reset_index()
 id_sequ_df = id_sequ_df.rename(columns={'index': 'label'})
 id_seq_df = pd.merge(id_seq_df, id_sequ_df.loc[:, ['whole', 'label']], on='whole')
+print(f'{len(id_seq_df)} tRNAs <= {args.max_id_dist} ID elements away.')
+print(f'Comprising {len(id_sequ_df)} unique combined identity part sequences.')
 
 with open(f'{args.output_directory}/{args.amino_acid}_id_seqs.fa', 'w+') as f:
     for i, row in id_sequ_df.iterrows():
@@ -269,6 +272,8 @@ else:
     id_df.to_csv(f'{args.output_directory}/{args.amino_acid}_df.csv')
     p = (ggplot(id_df_u, aes('umap1', 'umap2', colour='cluster')) + theme_void() + geom_point())
 
+print(f'{len(id_df[id_df.nearby])} tRNAs passing homology threshold {args.distance}')
+print(f'Comprising {len(id_df_u[id_df_u.nearby])} unique combined identity parts.')
 ggsave(p, f'{args.output_directory}/{args.amino_acid}_umap.pdf', dpi=300)
 
 

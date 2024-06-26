@@ -2,7 +2,7 @@
 
  /ˈkaɪ'tiː/ ('kai-tee')
 
-Pipeline creates tRNAs for use in genetic code expansion. tRNAs are designed to be active, orthogonal to the E. coli machinery, and recognised by their corresponding synthetase.
+Pipeline creates tRNAs for use in genetic code expansion. tRNAs are designed to be active, orthogonal to the _E. coli_ machinery, and recognised by their corresponding synthetase.
 
 ## Requirements
 
@@ -14,13 +14,13 @@ Python 3 must be installed and added to the PATH.
 
 Clone the GitHub repository using
 
-```git clone https://github.com/zyzzyva23/Chi-T.git```
+```> git clone https://github.com/zyzzyva23/Chi-T.git```
 
 Or download directly from [https://github.com/zyzzyva23/Chi-T](https://github.com/zyzzyva23/Chi-T)
 
 Once installed, required Python packages can be installed with the command:
 
-```pip install -r requirements.txt```
+```> pip install -r requirements.txt```
 
 ## Usage
 ### tRNA database
@@ -30,7 +30,7 @@ To format in a way Chi-T can use, use the script cleanup.py with the following c
 
 ```> python cleanup.py <tRNA_file.tab> <alignment_file.xlsx> ```
 
-A D-loop alignment file is supplied in the distribution as d_align.xlsx.
+A D-loop alignment file is supplied in the distribution as d_align.xlsx. More aligned D-loop sequences can be added manually, although Chi-T also automatically aligns D-loops not in the D-loop alignment file by anchoring to the XGGX motif.
 
 ### Synthetase File
 
@@ -46,14 +46,53 @@ Synth Name | Synth ID | tRNA ID | Genome ID
 
 * Genome ID - A genome identifier for the organism (although currently unused)
 
+Supplying synthetases to RS-ID requires this format also.
+
+### Identitying synthetases to test using RS-ID
+
+RS-ID can aid in synthetase selection by filtering for tRNAs with similar identity elements and identity parts. Supplying a synthetase, or several synthetases, restricts the search to sequences that pass similarity thresholds to the supplied synthetases' tRNAs. Running the script without supplying a synthetase returns a UMAP projection and clusters of all unique identity sequences in the isoacceptor class given.
+
+To run, a usearch executable must be downloaded, and its file location given in the command line. This executable can be downloaded [here](https://www.drive5.com/usearch/download.html).
+
+An example use case is shown below:
+
+```> python synth_finder.py clean_trnas.csv Arg -o outputs/Pyr_112_output -sf my_synths.xlsx -sn Pyrococcus_synth_112 -d 0.2 -i 1```
+
+#### Arguments
+
+* positional arguments:
+    * file
+        * Clean tRNADB-CE file
+    * amino_acid
+        * Isoacceptor of choice
+
+* Optional arguments:
+    * -h, --help
+        * Show help message and exit
+    * -a, --anticodon
+    * Change all anticodon sequences - has little effect on process
+    * -o, --output_directory
+    * Directory to save all files
+    * -sf, --synth_file:
+    * If specifying a synthetase, must be found in this file in excel format (formatting of file above)
+    * -sn, --synth_name:
+    * Name of user-defined synthetase - name must be found in synth_file
+    * -u, --usearch:
+    * File path of usearch executable
+    * -d, --distance:
+    * Upper threshold for USEARCH distance - default <= 0.2
+    * -i, --identity:
+    * Upper threshold for number of identity element nucleotide differences - default <= 1
+
+
 ### tRNA Designs
 
 To use Chi-T call the script main.py with the corresponding arguments and options. Use python main.py -h to get a description of all possible inputs. 
-An example use case is shown below
+An example use case is shown below:
 
 ```> python main.py clean_trnas.csv my_synths.xlsx Pyrococcus_synth_112 Arg -o outputs/Pyr_112_output -l -a CTA TGA CGA -s```
 
-### Arguments
+#### Arguments
 
 * positional arguments:
     * file
@@ -124,24 +163,19 @@ An example use case is shown below
     * -p, --pattern: PATTERN
         * Specify a csv file with synth name and regex string column.
         * Example file provided in tRNA_patterns.csv
-    * -ham, --ham:
-        * Go ham.
-        * No part clustering, no selection. All part sequences that pass initial filtering are used in chimera generation.
-        * Naturally only one iteration required.
-        * Should only be used in specific circumstances with very small part pools e.g. with --subtle flag using an unusual tRNA sequence.
     * -t, --num_tRNAs: NUM_TRNAS
         * Number of designs to output for each synthetase.
         * Default 4.
 
-### Example Usage with Arguments
+#### Example Usage with Arguments
 
-```python main.py tRNA_database.csv synthetase_file.xlsx metSynth1 metSynth2 Met –o output_folder –ip tRNA1-7_66-72* –cp 70 –cm 30 –cf 0.3 0 1500000 0.1 –-subtle –-reference reference_file.csv –-length_filt 78 –-anticodons CTA TGA CGA –-frequency 0.5 –-diversity 3 –n 3  –m –i –p pattern_file.csv –ham –t 6```
+```> python main.py tRNA_database.csv synthetase_file.xlsx metSynth1 metSynth2 Met –o output_folder –ip tRNA1-7_66-72* –cp 70 –cm 30 –cf 0.3 0 1500000 0.1 –-subtle –-reference reference_file.csv –-length_filt 78 –-anticodons CTA TGA CGA –-frequency 0.5 –-diversity 3 –n 3  –m –i –p pattern_file.csv –ham –t 6```
 
-## Creating Oligos
+### Creating Oligos
 
 oligo_maker.py script included to produce csv file with designs.
 
-```python oligo_maker.py <tRNA design file> <output csv file> --forward_5 NNNNN --forward_3 NNNNN --reverse_5 NNNN --reverse_3 NNNN --anticodon CTA```
+```> python oligo_maker.py <tRNA design file> <output csv file> --forward_5 NNNNN --forward_3 NNNNN --reverse_5 NNNN --reverse_3 NNNN --anticodon CTA```
 
 * tRNA design file: csv output file of main.py containing final designs
 * output csv file: name of file oligos should be written to.
@@ -151,22 +185,22 @@ oligo_maker.py script included to produce csv file with designs.
 * --reverse_3: sequence to add to 3' end of reverse primer. Default GC
 * --anticodon: Designs to be written to output file will have this anticodon. Default CTA
 
-## Checking a tRNA is in the database
+### Checking a tRNA is in the database
 
 tRNA_check.py script included to check if a tRNA ID is in the clean csv file of all tRNAs. Can be useful since many of the tRNA IDs specified in suppl. tables of Cervettini (2020) are not found in updated versions of tRNADB-CE.
 
-```python tRNA_check.py <tRNA DB file> <tRNA_id>```
+```> python tRNA_check.py <tRNA DB file> <tRNA_id>```
 
 * tRNA DB file: Clean tRNADB-CE csv file (processed through cleanup.py)
 * tRNA_id: tRNADB-CE ID (or any) to check
 
 If present, script will return the entry. Otherwise will return 'False'
 
-## Adding a tRNA to the database file
+### Adding a tRNA to the database file
 
 tRNA_adder.py script used to add tRNAs to your cleaned tRNADB-CE csv file. Useful as tRNADB-CE does not currently contain eukaryotic tRNAs.
 
-```python tRNA_adder.py <tRNA_file> <alignment_file> --new_name updated_tRNAs.csv```
+```> python tRNA_adder.py <tRNA_file> <alignment_file> --new_name updated_tRNAs.csv```
 
 * tRNA_file: Clean tRNADB-CE csv file
 * alignment_file: xlsx file containing D-loop alignments. Provided as d_align.xlsx

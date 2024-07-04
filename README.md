@@ -2,13 +2,17 @@
 
  /ˈkaɪ'tiː/ ('kai-tee')
 
+*On publication, this Github repository will be made public*
+
 Pipeline creates tRNAs for use in genetic code expansion. tRNAs are designed to be active, orthogonal to the _E. coli_ machinery, and recognised by their corresponding synthetase.
 
 ## Requirements
 
 RNAFold from the ViennaRNA package must be installed and added to the PATH. The ViennaRNA package can be installed from [here](https://www.tbi.univie.ac.at/RNA/#download).
 
-Python 3 must be installed and added to the PATH.
+Python 3 must be installed and added to the PATH. Package versions are compatible with Python 3.7 (and likely other Python 3.x which have not been tested).
+
+Chi-T has been tested successfully on Windows 10, macOS, and Ubuntu 18.04. To run with the default tRNADB-CE dataset, we recommend a minimum of 8 GB RAM.
 
 ## Installation
 
@@ -22,7 +26,16 @@ Once installed, required Python packages can be installed with the command:
 
 ```> pip install -r requirements.txt```
 
+To test everything is working, navigate to the Chi-T directory and run the following command for a quick demo run on a reduced dataset:
+
+```python main.py test_files/merged_test.csv test_files/Vir_pro_synth.xlsx Vir_pro Pro -o test_output/run_test -a CTA TGA CGA```
+
+Total installation time should be on the order of minutes, and this demo should take a few seconds to run without errors, saving files of tRNAs at every filtering stage and outputting a log file. Due to stochasticity within Chi-T there is no defined expected output.
+
 ## Usage
+
+A typical Chi-T run in Windows 10 on a 16-thread Ryzen 3700X CPU and 16 GB RAM took 1-2 hours. Usage without multiprocessing capabilities will take much longer.
+
 ### tRNA database
 The tRNA database to be used can be downloaded from [here](http://trna.ie.niigata-u.ac.jp/cgi-bin/trnadb/index.cgi) in tab separated format. 
 
@@ -47,6 +60,8 @@ Synth Name | Synth ID | tRNA ID | Genome ID
 * Genome ID - A genome identifier for the organism (although currently unused)
 
 Supplying synthetases to RS-ID requires this format also.
+
+For an example of formatting, see the file test_files/Vir_pro_synth.xlsx
 
 ### Identitying synthetases to test using RS-ID
 
@@ -153,6 +168,11 @@ An example use case is shown below:
         * Average diversity from RNAFold across anticodons to use as threshold in final filtering step.
         * tRNAs with diversity higher than threshold removed.
         * Default 5.0
+    * -F, --final_frequency: FINAL_FREQUENCY
+        * Average frequency threshold across anticodons
+        * Default 0.35
+    * -D, --final_diversity: FINAL_DIVERSITY
+        * Average diversity threshold across anticodons
     * -n, --num_iterations: NUM_ITERATIONS
         * Number of times to iterate through Chi-T per synthetase.
         * After each iteration, used parts are removed from the initial part pool (except the wild-type sequence)

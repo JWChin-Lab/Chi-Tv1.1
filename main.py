@@ -68,7 +68,7 @@ if __name__ == '__main__':
     parser.add_argument("-cp", "--cluster_parts", type=int,
                         help='Number of parts for each part type to cluster', default=200)
     parser.add_argument("-cm", "--cluster_min", type=int, help="Minimum number of remaining parts for clustering.",
-                        default=60)
+                        default=30)
     parser.add_argument('-s', '--subtle', help="If true, only parts <=2 mutations away from the native sequence are chosen",
                         action='store_true')
     parser.add_argument('-r', '--reference', help='If using subtle mode, this is the reference tRNA')

@@ -85,19 +85,19 @@ An example use case is shown below:
     * -h, --help
         * Show help message and exit
     * -a, --anticodon
-    * Change all anticodon sequences - has little effect on process
+        * Change all anticodon sequences - has little effect on process
     * -o, --output_directory
-    * Directory to save all files
+        * Directory to save all files
     * -sf, --synth_file:
-    * If specifying a synthetase, must be found in this file in excel format (formatting of file above)
+        * If specifying a synthetase, must be found in this file in excel format (formatting of file above)
     * -sn, --synth_name:
-    * Name of user-defined synthetase - name must be found in synth_file
+        * Name of user-defined synthetase - name must be found in synth_file
     * -u, --usearch:
-    * File path of usearch executable
+        * File path of usearch executable
     * -d, --distance:
-    * Upper threshold for USEARCH distance - default <= 0.2
+        * Upper threshold for USEARCH distance - default <= 0.2
     * -i, --identity:
-    * Upper threshold for number of identity element nucleotide differences - default <= 1
+        * Upper threshold for number of identity element nucleotide differences - default <= 1
 
 
 ### tRNA Designs

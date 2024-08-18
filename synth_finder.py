@@ -84,7 +84,7 @@ def UMAPPER_clust(file, neighbours=15, min_dist=0.1, spread=1.0, min_samples=60,
     if chosen:
         nearby = []
         for label in chosen:
-            nearby_ = [i for i, d in enumerate(new_dist[label, :]) if d < 0.2]
+            nearby_ = [i for i, d in enumerate(new_dist[label, :]) if d < args.distance]
             nearby += nearby_
 
 

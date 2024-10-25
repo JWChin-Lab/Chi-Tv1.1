@@ -104,7 +104,8 @@ def UMAPPER_clust(file, neighbours=15, min_dist=0.1, spread=1.0, min_samples=60,
     index['umap2'] = e[:, 1]
     index['cluster'] = labels
     index['cluster'] = index['cluster'].astype('category')
-    index['nearby'] = [True if i in nearby else False for i in range(len(index))]
+    if chosen:
+        index['nearby'] = [True if i in nearby else False for i in range(len(index))]
     #print(f'{len(e)} entries')
     return index
 

@@ -206,39 +206,41 @@ seqs_dict = {part_type: {part_t.seq: Part2(part_t.seq, part_type, args.amino_aci
                          if isinstance(part_t.align, str)}
              for part_type, part_list in seqs_dict.items()}
 
-chosen_parts = {}
-for part_type in id_parts:
-    chosen_parts[part_type] = {}
-    id_pos = [base for base in id_dict if base in part_to_range_2[part_type]]
-    for trna_id in trna_ids:
-        part = [part for seq, part in seqs_dict[part_type].items() if seq == chosen_dict[trna_id][part_type]][0]
-        id_seq_dict = {pos: base for pos, base in part.seq_dict.items() if pos in id_pos}
-        chosen_parts[part_type].update({trna_id: id_seq_dict})
-
-id_distance_dict = {}
-for part_type in id_parts:
-    id_distance_dict[part_type] = {}
-    id_pos = [base for base in id_dict if base in part_to_range_2[part_type]]
-    for trna_id in trna_ids:
-        id_distance_dict[part_type][trna_id] = {}
-        this_id_dict = chosen_parts[part_type][trna_id]
-        for seq, part in seqs_dict[part_type].items():
-            count = 0
-            for pos in id_pos:
-                if this_id_dict[pos] != part.seq_dict[pos]:
-                    count += 1
-            id_distance_dict[part_type][trna_id][seq] = count
-
-id_sequ_df['dist'] = id_sequ_df.apply(lambda x: dist_id(x, id_parts, id_distance_dict, trna_ids), axis=1)
-id_sequ_df = id_sequ_df[id_sequ_df.dist <= args.max_id_dist]
+if args.synth_name:
+    chosen_parts = {}
+    for part_type in id_parts:
+        chosen_parts[part_type] = {}
+        id_pos = [base for base in id_dict if base in part_to_range_2[part_type]]
+        for trna_id in trna_ids:
+            part = [part for seq, part in seqs_dict[part_type].items() if seq == chosen_dict[trna_id][part_type]][0]
+            id_seq_dict = {pos: base for pos, base in part.seq_dict.items() if pos in id_pos}
+            chosen_parts[part_type].update({trna_id: id_seq_dict})
+    
+    id_distance_dict = {}
+    for part_type in id_parts:
+        id_distance_dict[part_type] = {}
+        id_pos = [base for base in id_dict if base in part_to_range_2[part_type]]
+        for trna_id in trna_ids:
+            id_distance_dict[part_type][trna_id] = {}
+            this_id_dict = chosen_parts[part_type][trna_id]
+            for seq, part in seqs_dict[part_type].items():
+                count = 0
+                for pos in id_pos:
+                    if this_id_dict[pos] != part.seq_dict[pos]:
+                        count += 1
+                id_distance_dict[part_type][trna_id][seq] = count
+    
+    id_sequ_df['dist'] = id_sequ_df.apply(lambda x: dist_id(x, id_parts, id_distance_dict, trna_ids), axis=1)
+    id_sequ_df = id_sequ_df[id_sequ_df.dist <= args.max_id_dist]
 
 id_sequ_df = id_sequ_df.reset_index()
 id_sequ_df = id_sequ_df.drop(columns=['index'])
 id_sequ_df = id_sequ_df.reset_index()
 id_sequ_df = id_sequ_df.rename(columns={'index': 'label'})
 id_seq_df = pd.merge(id_seq_df, id_sequ_df.loc[:, ['whole', 'label']], on='whole')
-print(f'{len(id_seq_df)} tRNAs <= {args.max_id_dist} ID elements away.')
-print(f'Comprising {len(id_sequ_df)} unique combined identity part sequences.')
+if args.synth_name:
+    print(f'{len(id_seq_df)} tRNAs <= {args.max_id_dist} ID elements away.')
+    print(f'Comprising {len(id_sequ_df)} unique combined identity part sequences.')
 
 with open(f'{args.output_directory}/{args.amino_acid}_id_seqs.fa', 'w+') as f:
     for i, row in id_sequ_df.iterrows():
@@ -264,17 +266,18 @@ if args.synth_name:
          scale_size_manual(sizes)) + scale_alpha_manual({True: 1, False: 0.5})#+ scale_shape_manual(shapes) + geom_label(check_overlap=True))
     # p = (ggplot() + geom_point(id_df_u, aes('umap1', 'umap2', colour='cluster'), size=0.1, fill=None) + \
     #      geom_point(id_df_u[id_df_u.user_defined != '0'], aes('umap1', 'umap2', shape='user_defined'), shape='o') + theme_void())
+    print(f'{len(id_df[id_df.nearby])} tRNAs passing homology threshold {args.distance}')
+    print(f'Comprising {len(id_df_u[id_df_u.nearby])} unique combined identity parts.')
 
 else:
     dist_clusts = UMAPPER_clust(f'{args.output_directory}/{args.amino_acid}_id_mat.txt')
     id_df_u = pd.merge(id_sequ_df, dist_clusts, on='label')
     df_for_merge = id_df_u.loc[:, ['label', 'umap1', 'umap2', 'cluster']]
-    id_df = pd.merge(df_for_merge, id_seq_df, on='whole')
+    id_df = pd.merge(df_for_merge, id_seq_df, on='label')
     id_df.to_csv(f'{args.output_directory}/{args.amino_acid}_df.csv')
     p = (ggplot(id_df_u, aes('umap1', 'umap2', colour='cluster')) + theme_void() + geom_point())
 
-print(f'{len(id_df[id_df.nearby])} tRNAs passing homology threshold {args.distance}')
-print(f'Comprising {len(id_df_u[id_df_u.nearby])} unique combined identity parts.')
+
 ggsave(p, f'{args.output_directory}/{args.amino_acid}_umap.pdf', dpi=300)
 
 

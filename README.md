@@ -105,7 +105,7 @@ An example use case is shown below:
 To use Chi-T call the script main.py with the corresponding arguments and options. Use python main.py -h to get a description of all possible inputs. 
 An example use case is shown below:
 
-```> python main.py clean_trnas.csv my_synths.xlsx Pyrococcus_synth_112 Arg -o outputs/Pyr_112_output -l -a CTA TGA CGA -s```
+```> python main.py clean_trnas.csv my_synths.xlsx Pyrococcus_synth_112 Arg -o outputs/Pyr_112_output -l -a CTA TGA CGA```
 
 #### Arguments
 
@@ -138,7 +138,7 @@ An example use case is shown below:
     * -cm, --cluster_min: CLUSTER_MIN
         * Minimum number of remaining parts for clustering.
         * If the number of sequences in the part pool is lower than this number, clustering doesn't occur in order to keep numbers high enough.
-        * Instead, 30 best scoring sequences are sampled randomly.
+        * Instead, 30 best scoring sequences are sampled randomly, and the most diverse sequences from this pool used for chimerification.
         * Separate from -cp and -cm arguments, if the number of sequences for a part is < 15, all sequences are used for chimera generation in every iteration.
     * -s, --subtle:          
         * If true, only parts <=2 mutations away from the native sequence are chosen (or a reference sequence if one is supplied)
@@ -177,7 +177,7 @@ An example use case is shown below:
         * Number of times to iterate through Chi-T per synthetase.
         * After each iteration, used parts are removed from the initial part pool (except the wild-type sequence)
     * -m, --automatic: 
-        * No user input required - without flag then user is required to approve multiple stages.
+        * No user input required - without flag then user is required to approve multiple stages (mainly to prevent a silly amount of tRNAs crashing your computer).
     * -i, --initial:
         * If true, save initial chimeras to csv (only if needed for analysis as can be a large file).
     * -p, --pattern: PATTERN

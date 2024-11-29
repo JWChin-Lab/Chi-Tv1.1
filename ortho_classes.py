@@ -447,7 +447,7 @@ class Isoacceptor2(object):
                 num_seqs_for_part = math.floor(len(part_list) / iter_remain)
                 sample_parts = part_list[:30]
                 if part_type in self.mid_part_types:
-                    diverse_seqs, _ = max_dist_parallel_memo(random.sample(sample_parts, 15), 7)
+                    diverse_seqs, _ = max_dist_parallel_memo(random.sample(sample_parts, 15), 7, self.ac)
                 else:
                     diverse_seqs, _ = max_dist_parallel_memo(sample_parts, min([num_seqs_for_part, 7]), self.ac)
                 for part in part_list:

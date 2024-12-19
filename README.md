@@ -2,8 +2,6 @@
 
  /ˈkaɪ'tiː/ ('kai-tee')
 
-*On publication, this Github repository will be made public*
-
 Pipeline creates tRNAs for use in genetic code expansion. tRNAs are designed to be active, orthogonal to the _E. coli_ machinery, and recognised by their corresponding synthetase.
 
 ## Requirements
@@ -25,6 +23,8 @@ Or download directly from [https://github.com/zyzzyva23/Chi-T](https://github.co
 Once installed, required Python packages can be installed with the command:
 
 ```> pip install -r requirements.txt```
+
+You should note many of these package versions are now 'old', and so conflicts may arise if you attempt to mix the versions in the requirements with other newer versions (especially note the incompatibility with many versions of pandas with numpy 2.0.0 or later)
 
 To test everything is working, navigate to the Chi-T directory and run the following command for a quick demo run on a reduced dataset:
 

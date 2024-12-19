@@ -94,4 +94,4 @@ if __name__ == '__main__':
     d_al_dict = alignment_dict(args.alignment_file)
     clean = make_big_clean(args.trna_file, d_al_dict)
     merged = merge_parts(clean)
-    merged.to_csv('merged_test.csv')
+    merged.to_csv('clean_tRNA_DB.csv')
